@@ -1,0 +1,89 @@
+# Base
+.git
+.gitignore
+.gitattributes
+pycache/
+__pycache__
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+*.so
+.egg-info/
+.eggs/
+.cache/
+.mypy_cache/
+.pytype/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+dist/
+build/
+site/
+htmlcov/
+.coverage
+.coverage.
+pytestdebug.log
+dmypy.json
+.mprof
+.prof
+*.prof
+
+# IDE/OS
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Env and package managers
+.env
+.env.*
+example.env
+.venv/
+venv/
+.envrc
+# Мы используем frozen зависимости для сборки контейнера, поэтому package managers не трогаем
+# poetry.lock
+# Pipfile.lock
+# uv.lock
+
+# Docker artifacts
+Dockerfile
+.docker
+dockerignore
+docker-compose*.yaml
+docker-compose*.yml
+
+# Data, models, caches, and heavy artifacts
+data/
+tmp/
+assets/.png
+assets/.drawio
+examples/
+*.joblib
+*.parquet
+*.safetensors
+*.tar
+*.tar.gz
+.tar.gz.
+*.zip
+*.pth
+*.pt
+*.onnx
+*.bin
+*.h5
+*.npz
+*.npy
+
+# Logs and runtime files
+logs/
+*.log
+*.pid
+
+# Checkpoints and training outputs
+checkpoints/
+outputs/
+runs/
+tensorboard/
+lightning_logs/

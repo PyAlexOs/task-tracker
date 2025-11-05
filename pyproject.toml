@@ -1,0 +1,11 @@
+[project]
+name = "task-tracker"
+version = "0.1.0"
+description = "Приложение для распознавания переговоров и их суммаризации, а также отслеживания статусов задач в рабочих чатах."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.120.1",
+    "pydantic>=2.12.3",
+    "uvicorn>=0.38.0",
+]

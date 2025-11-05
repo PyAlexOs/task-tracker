@@ -1,0 +1,50 @@
+repos:
+  # Применение линтера при коммите
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.12.7
+    hooks:
+      - id: ruff-format
+        args: ["--config=ruff.toml"]
+      - id: ruff
+        args: ["--fix", "--config=ruff.toml"]
+
+  # Статический анализ типов
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.17.1
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run mypy
+        language: system
+        args: [
+          "--explicit-package-bases",
+          "--install-types",
+          "--non-interactive",
+          "--config-file=mypy.ini"
+        ]
+        # Лучше указать, какие директории нужно проверить
+        files: ^(src/|tests/|scripts/)
+
+  # Общее
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-ast               # проверка корректности синтаксиса
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: end-of-file-fixer       # добавление новой строки в конец
+      - id: trailing-whitespace     # удаление пробелов в конце строк
+      - id: detect-private-key      # проверка на утечки приватных ключей
+      - id: check-added-large-files # контроль размера добавляемых файлов (Максимум 50 МБ)
+        args: ["--maxkb=51200"]
+      - id: check-case-conflict     # конфликт имён с разным регистром (важно на Windows)
+      - id: check-merge-conflict    # поиск незавершённых конфликтов слияния
+
+  # Очистка вывода ноутбука перед коммитом
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.8.1
+    hooks:
+      - id: nbstripout
+        args: ["--extra-keys", "metadata"]
+        types: [jupyter]
