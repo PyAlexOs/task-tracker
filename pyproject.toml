@@ -5,15 +5,32 @@ description = "Приложение для распознавания перег
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "faiss-gpu-cu12>=1.12.0",
+    "aio-pika>=9.5.8",
+    "pydantic>=2.12.3",
+    "pydantic-settings>=2.11.0",
+]
+
+[project.optional-dependencies]
+
+api-gateway = [
     "fastapi>=0.120.1",
+]
+
+canban-connectors = [
+
+]
+
+similarity = [
+
+]
+
+speech-transcriptor = [
+    "faiss-gpu-cu12>=1.12.0",
     "nemo>=7.2.4",
     "nemo-toolkit[asr]>=2.5.2",
     "numpy==1.26.4",
     "omegaconf>=2.3.0",
     "pyannote-audio>=3.3.2,<4.0.0", # Совместимость с whisperx
-    "pydantic>=2.12.3",
-    "pydantic-settings>=2.11.0",
     "pydub>=0.25.1",
     "torch>=2.4.0,<2.9.0", # Совместима с pyannote
     "torchaudio>=2.4.0,<2.9.0",
@@ -23,4 +40,14 @@ dependencies = [
     "onnx==1.18",
     "nvidia-cudnn-cu12>=9.10.2.21",
     "nvidia-cublas-cu12>=12.8.4.1",
+    "noisereduce>=3.0.3",
+    "scipy>=1.16.3",
+]
+
+text-summarizer = [
+
+]
+
+user-connectors = [
+
 ]

@@ -23,13 +23,13 @@ recognizer = LocalSpeechRecognizer(
     hf_token=os.getenv("HF_SECRET_TOKEN"),
 )
 
-segments = recognizer.transcribe("vazelin.wav", language="ru")
+segments = recognizer.transcribe("vazelin.ogg", language="ru")
 for seg in segments:
     logger.info(f"[{seg.start:.2f}s - {seg.end:.2f}s]: {seg.text}")
 
 
 segments_with_speakers = recognizer.transcribe_with_diarization(
-    "vazelin.wav",
+    "vazelin.ogg",
     language="ru",
     min_speakers=2,
     max_speakers=4,

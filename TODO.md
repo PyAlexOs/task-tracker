@@ -1,12 +1,18 @@
 1. API Сервиса распознавания и диаризации речи (Audio2Text)
-- [ ] разработка модуля распознавания речи (sudo apt install ffmpeg nvidia-cuda-toolkit & sudo apt-get install libcudnn8)
-- [ ] разработка диаризации
+- [x] разработка модуля распознавания речи
+- [x] разработка диаризации
+
+Поднятие микросервиса:
   ```
+    sudo apt install ffmpeg nvidia-cuda-toolkit & sudo apt-get install libcudnn8
     wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.0-1_all.deb
     sudo dpkg -i cuda-keyring_1.0-1_all.deb
     sudo apt update && sudo apt upgrade
     sudo apt install libcudnn8 libcudnn8-dev
   ```
+
+- [ ] Рефакторинг кода
+- [ ] Вынесение в конфиги параметров
 
 1. API Сервиса обработки текста (LLM: RAG + summarize)
 - [ ] rag на основе составленной и поддерживаемой в актуальном состоянии базы знаний
@@ -20,7 +26,7 @@
 - [ ] при отсутствии нового текста для карточки - подсветка
 
 1. API Коннекторов can-ban (прокси)
-- [ ] Обновление по API Trello и Kaiten (другие канбан доски) и операции CRUD
+- [ ] Обновление по API Trello и Kaiten (другие канбан доски) и операции CRUD (py trello)
 
 1. API Коннекторов пользователей (Использует основное API, по сути масштабируемый CLI)
 - [ ] Отправление запроса на подтверждение пользователю с достаточными правами

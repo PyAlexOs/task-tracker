@@ -1,57 +1,147 @@
+""""""
+
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
+import noisereduce as nr
+import numpy as np
 import torch
+from pydub import AudioSegment
+from scipy.io import wavfile
+
+
+@dataclass
+class DiarizationSegment:
+    """Сегмент диаризации с информацией о говорящем.
+    
+    Args:
+        start (float): старт в миллисекундах.
+        end (float): 
+        speaker (str): 
+    """
+
+    start: float
+    end: float
+    speaker: str | None = None
 
 
 @dataclass
 class TranscriptionSegment:
-    """Сегмент распознанного текста с временными метками."""
+    """Сегмент распознанного текста с временными метками.
+    
+    """
 
     start: float
     end: float
     text: str
     speaker: str | None = None
 
-    def __repr__(self) -> str:
-        return 
-
-
-@dataclass
-class DiarizationSegment:
-    """Сегмент диаризации с информацией о говорящем."""
-
-    start: float
-    end: float
-    speaker: str
-
 
 class BaseSpeechRecognizer(ABC):
-    """Абстрактный базовый класс для транскрибатора речи со встроенной диаризацией.
-
-    Определяет интерфейс для работы с моделями распознавания речи
-    и диаризации говорящих. Поддерживает как API-based, так и
-    локальные реализации моделей.
+    """
     """
 
-    def __init__(self, device: str | None = None) -> None:
+    def __init__(self, device: Literal["cuda", "cpu"] = "cuda") -> None:
         """Инициализация распознавателя речи.
 
         Args:
-            device (Literal['cuda', 'cpu']): Устройство для вычислений ('cuda', 'cpu', если None,
-                используется cuda). Defaults to None.
+            device (Literal["cuda", "cpu"]): Устройство для вычислений. Defaults to "cuda".
         """
 
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.device = device
+        self.logger.debug("Инициализация распознавателя на устройстве: %s", self.device)
 
-        if device is None:
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+    def _convert_input_file(
+        self,
+        audio_path: str | Path,
+        output_path: str | Path | None = None,
+        target_sample_rate: int = 16000,
+    ) -> Path:
+        """Конвертация аудио в WAV с нужной частотой дискретизации и моно каналом.
+
+        Args:
+            audio_path (str | Path): Путь к исходному аудиофайлу.
+            output_path (str | Path | None): Путь для сохранения конвертированного файла.
+                Если None, создается рядом с исходным. Defaults to None.
+            target_sample_rate (int): Целевая частота дискретизации. Defaults to 16000.
+
+        Returns:
+            Path: Путь к файлу, конвертированному в WAV формат.
+        """
+
+        audio_path = Path(audio_path)
+        if output_path is None:
+            output_path = audio_path.parent / f"{audio_path.stem}_converted.wav"
         else:
-            self.device = device
+            output_path = Path(output_path)
 
-        self.logger.info("Инициализация распознавателя на устройстве: %s", self.device)
+        self.logger.debug("Конвертация аудио: %s -> %s", audio_path, output_path)
+        audio_segment: AudioSegment = AudioSegment.from_file(audio_path)
+        audio_segment = audio_segment.set_frame_rate(target_sample_rate)
+        audio_segment: AudioSegment = audio_segment.set_channels(1)
+
+        audio_segment.export(output_path, format="wav")
+        self.logger.debug("Конвертация завершена. Результат сохранён в файл: %s", output_path)
+        return output_path
+
+    def _reduce_noise_in_audio(
+        self,
+        wav_path: str | Path,
+        output_path: str | Path | None = None,
+        noise_sample_sec: float = 0.5,
+    ) -> Path:
+        """Удаление шума из аудио файла WAV.
+
+        Args:
+            wav_path (str | Path): Путь к WAV аудиофайлу.
+            output_path (str | Path | None): Путь для сохранения результата.
+                Если None, создается рядом с исходным. Defaults to None.
+            noise_sample_sec (float): Длительность отрывка из начала файла,
+                используемая для образца шума.
+
+        Returns:
+            Path: Путь к файлу c подавленными шумами.
+        """
+        wav_path = Path(wav_path)
+        if output_path is None:
+            output_path = wav_path.parent / f"{wav_path.stem}_denoised.wav"
+        else:
+            output_path = Path(output_path)
+
+        self.logger.debug("Применение шумоподавления: %s -> %s", wav_path, output_path)
+        rate, data = wavfile.read(str(wav_path))
+        # Преобразование данных к float32 в диапазоне [-1, 1]
+        if data.dtype == np.int16:
+            audio_data = data.astype(np.float32) / 32768.0
+        elif data.dtype == np.int32:
+            audio_data = data.astype(np.float32) / 2147483648.0
+        elif np.issubdtype(data.dtype, np.floating):
+            audio_data = data.astype(np.float32)
+        else:
+            raise ValueError(f"Неизвестный формат данных аудио: {data.dtype}")
+
+        # Получение образца шума из начала записи, но не длиннее файла
+        noise_sample_len = min(int(noise_sample_sec * rate), len(audio_data) // 10)
+        noise_sample = audio_data[:noise_sample_len]
+
+        # Применение шумоподавления
+        reduced_noise = nr.reduce_noise(
+            y=audio_data,
+            sr=rate,
+            y_noise=noise_sample,
+            stationary=False,
+        )
+
+        # Конвертация обратно к int16 для сохранения
+        denoised_int16 = np.clip(reduced_noise * 32768.0, -32768, 32767).astype(np.int16)
+        wavfile.write(str(output_path), rate, denoised_int16)
+
+        self.logger.info("Шумоподавление завершено: %s", output_path)
+        return output_path
 
     @abstractmethod
     def transcribe(
@@ -59,15 +149,7 @@ class BaseSpeechRecognizer(ABC):
         audio_path: str | Path,
         language: str | None = None,
     ) -> list[TranscriptionSegment]:
-        """Распознавание речи из аудиофайла.
-
-        Args:
-            audio_path (str | Path): Путь к аудиофайлу.
-            language (str | None): Язык аудио (ISO 639-1 код, например 'ru', 'en').
-                Если None, язык определяется автоматически.
-
-        Returns:
-            Список сегментов с распознанным текстом и временными метками.
+        """
         """
         pass
 
@@ -78,35 +160,18 @@ class BaseSpeechRecognizer(ABC):
         min_speakers: int | None = None,
         max_speakers: int | None = None,
     ) -> list[DiarizationSegment]:
-        """Диаризация говорящих в аудиофайле.
-
-        Args:
-            audio_path (str | Path): Путь к аудиофайлу.
-            min_speakers (int | None): Минимальное количество говорящих.
-            max_speakers: (int | None): Максимальное количество говорящих.
-
-        Returns:
-            Список сегментов с информацией о говорящих.
+        """
         """
         pass
 
     @abstractmethod
-    def transcribe_with_diarization(
+    def __call__(
         self,
         audio_path: str | Path,
         language: str | None = None,
         min_speakers: int | None = None,
         max_speakers: int | None = None,
     ) -> list[TranscriptionSegment]:
-        """Распознавание речи с диаризацией говорящих.
-
-        Args:
-            audio_path: Путь к аудиофайлу.
-            language: Язык аудио (ISO 639-1 код).
-            min_speakers: Минимальное количество говорящих.
-            max_speakers: Максимальное количество говорящих.
-
-        Returns:
-            Список сегментов с распознанным текстом и информацией о говорящих.
+        """
         """
         pass
