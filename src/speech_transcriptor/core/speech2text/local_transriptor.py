@@ -7,7 +7,6 @@ from pyannote.audio import Pipeline
 
 from src.speech_transcriptor.core.base import (
     BaseSpeechRecognizer,
-    DiarizationSegment,
     TranscriptionSegment,
 )
 
@@ -35,7 +34,8 @@ class LocalSpeechRecognizer(BaseSpeechRecognizer):
             device: Устройство для вычислений.
             compute_type: Тип вычислений ('float16', 'int8').
         """
-        super().__init__(device)
+        self.device = device
+        self.logger.debug("Инициализация распознавателя на устройстве: %s", self.device)
 
         self.model_name = model_name
         self.compute_type = compute_type
@@ -93,7 +93,7 @@ class LocalSpeechRecognizer(BaseSpeechRecognizer):
         audio_path: str | Path,
         min_speakers: int | None = None,
         max_speakers: int | None = None,
-    ) -> list[DiarizationSegment]:
+    ) -> pd.DataFrame:
         """Диаризация говорящих в аудиофайле."""
 
         if self.diarization_pipeline is None:
@@ -121,9 +121,8 @@ class LocalSpeechRecognizer(BaseSpeechRecognizer):
                 "speaker": speaker,
             })
 
-        diarization_df = pd.DataFrame(segments)
         self.logger.info(f"Обнаружено {len(segments)} сегментов диаризации")
-        return diarization_df
+        return pd.DataFrame(segments)
 
     def transcribe_with_diarization(
         self,

@@ -14,10 +14,11 @@ dependencies = [
 
 api-gateway = [
     "fastapi>=0.120.1",
+    "uvicorn>=0.38.0",
 ]
 
 canban-connectors = [
-
+    "py-trello>=0.20.1",
 ]
 
 similarity = [
@@ -25,27 +26,22 @@ similarity = [
 ]
 
 speech-transcriptor = [
-    "faiss-gpu-cu12>=1.12.0",
-    "nemo>=7.2.4",
-    "nemo-toolkit[asr]>=2.5.2",
-    "numpy==1.26.4",
-    "omegaconf>=2.3.0",
-    "pyannote-audio>=3.3.2,<4.0.0", # Совместимость с whisperx
-    "pydub>=0.25.1",
-    "torch>=2.4.0,<2.9.0", # Совместима с pyannote
-    "torchaudio>=2.4.0,<2.9.0",
-    "uvicorn>=0.38.0",
-    "openai-whisper>=20231117",
-    "whisperx>=3.1.0,<3.7.0",
-    "onnx==1.18",
-    "nvidia-cudnn-cu12>=9.10.2.21",
-    "nvidia-cublas-cu12>=12.8.4.1",
+    "nemo>=7.2.5",
+    "nemo-toolkit[asr]>=2.1.0",
     "noisereduce>=3.0.3",
+    "numpy>=2.2.6",
+    "openai-whisper>=20250625",
+    "pandas>=2.3.3",
+    "pyannote-audio>=4.0",
+    "pydub>=0.25.1",
     "scipy>=1.16.3",
+    "torchaudio>=2.8.0,<2.9.0",
+    "whisperx>=3.4.3",
 ]
 
 text-summarizer = [
-
+    "openai>=2.8.1",
+    "vllm>=0.11.2",
 ]
 
 user-connectors = [

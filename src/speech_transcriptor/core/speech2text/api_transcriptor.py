@@ -2,7 +2,6 @@ from pathlib import Path
 
 from src.speech_transcriptor.core.base import (
     BaseSpeechRecognizer,
-    DiarizationSegment,
     TranscriptionSegment,
 )
 
@@ -58,7 +57,7 @@ class APISpeechRecognizer(BaseSpeechRecognizer):
         audio_path: str | Path,
         min_speakers: int | None = None,
         max_speakers: int | None = None,
-    ) -> list[DiarizationSegment]:
+    ) -> list:
         """Диаризация через API."""
 
         self.logger.info(f"Отправка запроса на диаризацию через API: {audio_path}")

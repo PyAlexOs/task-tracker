@@ -1,0 +1,66 @@
+version: '1.0'
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: postgres-pgvector
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASSWORD=${RABBITMQ_DEFAULT_PASSWORD}
+    ports:
+      - "5672:5672"    # AMQP protocol port
+      - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_log:/var/log/rabbitmq
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  api_gateway:
+    build: ./src/api_gateway
+    container_name: api_gateway-container
+    command: ["uv", "run", "-m", "src.api_gateway.service"]
+    ports:
+      - ${APP_PORT}:${APP_PORT}
+    environment:
+      - APP_PORT=${APP_PORT}
+      - VAULT_URL=${VAULT_URL}
+      - VAULT_TOKEN=${VAULT_TOKEN}
+      - VAULT_MOUNT=${VAULT_MOUNT}
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -f http://localhost:$${APP_PORT:-8000}/health"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 1m
+      resources:
+        reservations:
+          memory: 2g
+        limits:
+          memory: 3g
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  rabbitmq_log:

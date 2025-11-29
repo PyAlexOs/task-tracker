@@ -1,4 +1,5 @@
-""""""
+"""
+"""
 
 import logging
 from abc import ABC, abstractmethod
@@ -8,30 +9,19 @@ from typing import Literal
 
 import noisereduce as nr
 import numpy as np
-import torch
+import pandas as pd
 from pydub import AudioSegment
 from scipy.io import wavfile
 
 
 @dataclass
-class DiarizationSegment:
+class TranscriptionSegment:
     """Сегмент диаризации с информацией о говорящем.
     
     Args:
         start (float): старт в миллисекундах.
         end (float): 
-        speaker (str): 
-    """
-
-    start: float
-    end: float
-    speaker: str | None = None
-
-
-@dataclass
-class TranscriptionSegment:
-    """Сегмент распознанного текста с временными метками.
-    
+        speaker (str): Может быть его не надо определять
     """
 
     start: float
@@ -50,15 +40,12 @@ class BaseSpeechRecognizer(ABC):
         Args:
             device (Literal["cuda", "cpu"]): Устройство для вычислений. Defaults to "cuda".
         """
-
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.device = device
-        self.logger.debug("Инициализация распознавателя на устройстве: %s", self.device)
 
     def _convert_input_file(
         self,
         audio_path: str | Path,
-        output_path: str | Path | None = None,
+        output_path: str | Path,
         target_sample_rate: int = 16000,
     ) -> Path:
         """Конвертация аудио в WAV с нужной частотой дискретизации и моно каналом.
@@ -159,7 +146,7 @@ class BaseSpeechRecognizer(ABC):
         audio_path: str | Path,
         min_speakers: int | None = None,
         max_speakers: int | None = None,
-    ) -> list[DiarizationSegment]:
+    ) -> pd.DataFrame:
         """
         """
         pass
