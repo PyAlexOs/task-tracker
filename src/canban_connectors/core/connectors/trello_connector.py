@@ -1,25 +1,25 @@
 @dataclass
 class TrelloCardData(CardData):
     """Представление карточки Trello."""
-    
+
     card_obj: Any  # trello.Card объект из py-trello
-    
+
     def get_id(self) -> str:
         return self.card_obj.id
 
 
 class TrelloKanbanCRUD(KanbanBoardCRUD):
     """Реализация интерфейса для работы с Trello через py-trello."""
-    
+
     def __init__(self, api_key: str, token: str):
         """Инициализация клиента Trello.
-        
+
         Args:
             api_key: API ключ Trello
             token: OAuth токен
         """
         from trello import TrelloClient
-        
+
         self.client = TrelloClient(
             api_key=api_key,
             token=token,
@@ -50,13 +50,13 @@ class TrelloKanbanCRUD(KanbanBoardCRUD):
     def list_cards(self, board_id: str, list_id: str | None = None) -> list[TrelloCardData]:
         """Получить список карточек доски или конкретной колонки."""
         board = self._get_board(board_id)
-        
+
         if list_id:
             trello_list = self.client.get_list(list_id)
             cards = trello_list.list_cards()
         else:
             cards = board.all_cards()
-        
+
         return [TrelloCardData(card_obj=card) for card in cards]
 
     def create_card(
@@ -72,7 +72,7 @@ class TrelloKanbanCRUD(KanbanBoardCRUD):
     ) -> TrelloCardData:
         """Создать новую карточку в указанной колонке."""
         trello_list = self.client.get_list(list_id)
-        
+
         # Подготовка параметров
         card = trello_list.add_card(
             name=name,
@@ -82,7 +82,7 @@ class TrelloKanbanCRUD(KanbanBoardCRUD):
             position=position,
             assign=list(members) if members else None,
         )
-        
+
         return TrelloCardData(card_obj=card)
 
     def read_card(self, card_id: str) -> TrelloCardData | None:
@@ -102,14 +102,14 @@ class TrelloKanbanCRUD(KanbanBoardCRUD):
     ) -> TrelloCardData:
         """Обновить базовые поля карточки."""
         card = self._get_card(card_id)
-        
+
         if name is not None:
             card.set_name(name)
         if description is not None:
             card.set_description(description)
         if closed is not None:
             card.set_closed(closed)
-        
+
         self._invalidate_card_cache(card_id)
         return TrelloCardData(card_obj=card)
 
@@ -184,16 +184,16 @@ class TrelloKanbanCRUD(KanbanBoardCRUD):
     def set_card_members(self, card_id: str, member_ids: Iterable[str]) -> None:
         """Заменить список ответственных."""
         card = self._get_card(card_id)
-        
+
         # Удаляем текущих участников
         current_members = [member.id for member in card.member_id]
         for member_id in current_members:
             card.unassign(member_id)
-        
+
         # Добавляем новых
         for member_id in member_ids:
             card.assign(member_id)
-        
+
         self._invalidate_card_cache(card_id)
 
     # --------- Метки (Labels) ---------
@@ -224,22 +224,24 @@ class TrelloKanbanCRUD(KanbanBoardCRUD):
         """Получить чек‑листы карточки."""
         card.card_obj.fetch_checklists()
         checklists = []
-        
+
         for checklist in card.card_obj.checklists:
             items = [
                 {
-                    'id': item['id'],
-                    'name': item['name'],
-                    'checked': item['checked'],
+                    "id": item["id"],
+                    "name": item["name"],
+                    "checked": item["checked"],
                 }
                 for item in checklist.items
             ]
-            checklists.append({
-                'id': checklist.id,
-                'name': checklist.name,
-                'items': items,
-            })
-        
+            checklists.append(
+                {
+                    "id": checklist.id,
+                    "name": checklist.name,
+                    "items": items,
+                }
+            )
+
         return checklists
 
     def add_checklist(
@@ -250,21 +252,21 @@ class TrelloKanbanCRUD(KanbanBoardCRUD):
     ) -> str:
         """Создать чек‑лист с опциональными пунктами."""
         card = self._get_card(card_id)
-        
+
         item_names = []
         item_states = []
-        
+
         if items:
             for item_name, checked in items:
                 item_names.append(item_name)
                 item_states.append(checked)
-        
+
         checklist = card.add_checklist(
             title=name,
             items=item_names,
             itemstates=item_states if item_states else None,
         )
-        
+
         self._invalidate_card_cache(card_id)
         return checklist.id
 
@@ -277,15 +279,16 @@ class TrelloKanbanCRUD(KanbanBoardCRUD):
         """Добавить пункт в чек-лист."""
         # Получаем чек-лист через API
         json_obj = self.client.fetch_json(
-            f'/checklists/{checklist_id}',
-            http_method='GET',
+            f"/checklists/{checklist_id}",
+            http_method="GET",
         )
-        
+
         from trello import Checklist
+
         checklist = Checklist(self.client, checked=False, obj=json_obj)
-        
+
         item = checklist.add_checklist_item(name, checked)
-        return item['id']
+        return item["id"]
 
     def update_checklist_item(
         self,
@@ -296,27 +299,28 @@ class TrelloKanbanCRUD(KanbanBoardCRUD):
     ) -> None:
         """Обновить пункт чек-листа."""
         params = {}
-        
+
         if name is not None:
-            params['name'] = name
+            params["name"] = name
         if checked is not None:
-            params['state'] = 'complete' if checked else 'incomplete'
-        
+            params["state"] = "complete" if checked else "incomplete"
+
         if params:
             self.client.fetch_json(
-                f'/checklists/{checklist_id}/checkItems/{item_id}',
-                http_method='PUT',
+                f"/checklists/{checklist_id}/checkItems/{item_id}",
+                http_method="PUT",
                 post_args=params,
             )
 
     def delete_checklist(self, checklist_id: str) -> None:
         """Удалить чек‑лист."""
         json_obj = self.client.fetch_json(
-            f'/checklists/{checklist_id}',
-            http_method='GET',
+            f"/checklists/{checklist_id}",
+            http_method="GET",
         )
-        
+
         from trello import Checklist
+
         checklist = Checklist(self.client, checked=False, obj=json_obj)
         checklist.delete()
 
@@ -325,16 +329,18 @@ class TrelloKanbanCRUD(KanbanBoardCRUD):
     def get_card_comments(self, card: TrelloCardData) -> list[dict[str, Any]]:
         """Получить список комментариев карточки."""
         card.card_obj.fetch_comments()
-        
+
         comments = []
         for comment in card.card_obj.comments:
-            comments.append({
-                'id': comment['id'],
-                'text': comment['data']['text'],
-                'date': comment['date'],
-                'member_id': comment.get('idMemberCreator', ''),
-            })
-        
+            comments.append(
+                {
+                    "id": comment["id"],
+                    "text": comment["data"]["text"],
+                    "date": comment["date"],
+                    "member_id": comment.get("idMemberCreator", ""),
+                }
+            )
+
         return comments
 
     def add_comment(self, card_id: str, text: str) -> str:
@@ -342,7 +348,7 @@ class TrelloKanbanCRUD(KanbanBoardCRUD):
         card = self._get_card(card_id)
         result = card.comment(text)
         self._invalidate_card_cache(card_id)
-        return result['id']
+        return result["id"]
 
     def update_comment(self, card_id: str, comment_id: str, text: str) -> None:
         """Обновить текст комментария."""
@@ -353,11 +359,11 @@ class TrelloKanbanCRUD(KanbanBoardCRUD):
     def delete_comment(self, card_id: str, comment_id: str) -> None:
         """Удалить комментарий."""
         card = self._get_card(card_id)
-        
+
         # Fetch comments to get the comment object
         card.fetch_comments()
-        comment_obj = next((c for c in card.comments if c['id'] == comment_id), None)
-        
+        comment_obj = next((c for c in card.comments if c["id"] == comment_id), None)
+
         if comment_obj:
             card.delete_comment(comment_obj)
             self._invalidate_card_cache(card_id)
@@ -368,13 +374,13 @@ class TrelloKanbanCRUD(KanbanBoardCRUD):
         """Получить все списки (колонки) доски."""
         board = self._get_board(board_id)
         lists = board.all_lists()
-        
+
         return [
             {
-                'id': lst.id,
-                'name': lst.name,
-                'closed': lst.closed,
-                'pos': lst.pos,
+                "id": lst.id,
+                "name": lst.name,
+                "closed": lst.closed,
+                "pos": lst.pos,
             }
             for lst in lists
         ]

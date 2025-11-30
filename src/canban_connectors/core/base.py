@@ -2,23 +2,22 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from typing import Any, TypeVar
 
-
 # ========== Абстрактные базовые классы ==========
 
 
 class CardData(ABC):
     """Абстрактный тип, обозначающий представление карточки канбан-доски.
-    
+
     Конкретные реализации коннекторов могут использовать свои датаклассы / Pydantic‑модели,
     которые наследуются от этого абстрактного типа.
     """
-    
+
     @abstractmethod
     def get_id(self) -> str:
         """Получить ID карточки."""
 
 
-TCardData = TypeVar('TCardData', bound=CardData)
+TCardData = TypeVar("TCardData", bound=CardData)
 
 
 class KanbanBoardCRUD(ABC):
@@ -29,7 +28,7 @@ class KanbanBoardCRUD(ABC):
     @abstractmethod
     def list_cards(self, board_id: str, list_id: str | None = None) -> list[CardData]:
         """Получить список карточек доски или конкретной колонки.
-        
+
         Args:
             board_id: ID доски
             list_id: ID колонки (если None, возвращаются карточки всей доски)
@@ -48,7 +47,7 @@ class KanbanBoardCRUD(ABC):
         position: str | int | None = None,
     ) -> CardData:
         """Создать новую карточку в указанной колонке.
-        
+
         Args:
             board_id: ID доски
             list_id: ID колонки
@@ -63,7 +62,7 @@ class KanbanBoardCRUD(ABC):
     @abstractmethod
     def read_card(self, card_id: str) -> CardData | None:
         """Получить карточку по ID.
-        
+
         Args:
             card_id: ID карточки
         """
@@ -77,7 +76,7 @@ class KanbanBoardCRUD(ABC):
         closed: bool | None = None,
     ) -> CardData:
         """Обновить базовые поля карточки.
-        
+
         Args:
             card_id: ID карточки
             name: Новое название
@@ -88,10 +87,10 @@ class KanbanBoardCRUD(ABC):
     @abstractmethod
     def delete_card(self, card_id: str) -> bool:
         """Удалить карточку по ID.
-        
+
         Args:
             card_id: ID карточки
-            
+
         Returns:
             True, если карточка была удалена
         """
@@ -133,7 +132,7 @@ class KanbanBoardCRUD(ABC):
     @abstractmethod
     def get_card_main_member(self, card: CardData) -> str | None:
         """Получить ID главного ответственного.
-        
+
         Возвращает первого участника из списка или None.
         """
 
@@ -168,7 +167,7 @@ class KanbanBoardCRUD(ABC):
     @abstractmethod
     def get_card_checklists(self, card: CardData) -> list[dict[str, Any]]:
         """Получить чек‑листы карточки.
-        
+
         Возвращает список словарей с информацией о чек-листах.
         Формат: [{'id': str, 'name': str, 'items': [{'id': str, 'name': str, 'checked': bool}]}]
         """
@@ -181,12 +180,12 @@ class KanbanBoardCRUD(ABC):
         items: Iterable[tuple[str, bool]] | None = None,
     ) -> str:
         """Создать чек‑лист с опциональными пунктами.
-        
+
         Args:
             card_id: ID карточки
             name: Название чек-листа
             items: Список кортежей (название_пункта, выполнен)
-            
+
         Returns:
             ID созданного чек-листа
         """
@@ -199,7 +198,7 @@ class KanbanBoardCRUD(ABC):
         checked: bool = False,
     ) -> str:
         """Добавить пункт в чек-лист.
-        
+
         Returns:
             ID созданного пункта
         """
@@ -223,14 +222,14 @@ class KanbanBoardCRUD(ABC):
     @abstractmethod
     def get_card_comments(self, card: CardData) -> list[dict[str, Any]]:
         """Получить список комментариев карточки.
-        
+
         Формат: [{'id': str, 'text': str, 'date': str, 'member_id': str}]
         """
 
     @abstractmethod
     def add_comment(self, card_id: str, text: str) -> str:
         """Добавить комментарий к карточке.
-        
+
         Returns:
             ID созданного комментария
         """
@@ -248,19 +247,19 @@ class KanbanBoardCRUD(ABC):
     @abstractmethod
     def list_lists(self, board_id: str) -> list[dict[str, Any]]:
         """Получить все списки (колонки) доски.
-        
+
         Формат: [{'id': str, 'name': str, 'closed': bool, 'pos': float}]
         """
 
     @abstractmethod
     def create_list(self, board_id: str, name: str, position: str | None = None) -> str:
         """Создать новую колонку на доске.
-        
+
         Args:
             board_id: ID доски
             name: Название колонки
             position: Позиция ('top', 'bottom')
-            
+
         Returns:
             ID созданной колонки
         """
