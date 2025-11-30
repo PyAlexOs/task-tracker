@@ -1,134 +1,120 @@
-import os
+from typing import Literal
 
 from openai import OpenAI
 
-from src.text_summarizer.core.base import BaseLLM
+from src.text_summarizer.core.base import BaseLLM, SummarizationType
 
 
 class OpenAILLM(BaseLLM):
-    """
-    Реализация для работы через OpenAI API (или совместимые API).
-    """
+    """Реализация для работы через OpenAI API (или совместимые API)."""
 
     def __init__(
         self,
-        api_key: str | None = None,
-        base_url: str | None = None,
-        model: str = "gpt-4o",
+        api_key: str,
+        base_url: str,
+        model_name: str,
         max_tokens: int = 2048,
     ):
-        """
+        """Конструктор класса.
 
         Args:
-            api_key: API ключ (если None, берется из OPENAI_API_KEY)
-            base_url: Базовый URL API (для совместимых API)
-            model: Название модели
-            max_tokens: Максимальное количество токенов
+            api_key (str): API ключ.
+            base_url (str): Базовый URL API (для совместимых API).
+            model_name (str): Название модели.
+            max_tokens (int): Максимальное количество токенов. Defaults to 2048.
         """
+        super().__init__()
 
-        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
-        if not self.api_key:
-            raise ValueError("API key required")
-        
-        self.client = OpenAI(
-            api_key=self.api_key,
+        self._api_key = api_key
+        self._client = OpenAI(
+            api_key=self._api_key,
             base_url=base_url,
         )
-        self.model = model
+
+        self.model_name = model_name
         self.max_tokens = max_tokens
 
+    @property
+    def summary_type2prompt(self) -> dict[SummarizationType | Literal["RAG"], str]:
+        """Маппинг типов суммаризации на системные промпты."""
+        # TODO вынести промпты в pydantic модели
+        # TODO сделать fallback на запрос отдельно по спикерам, если общий json не валидный
+        return {
+            SummarizationType.TEXT: (
+                "Ты — профессиональный ассистент для суммаризации текста. "
+                "Создай краткое и информативное резюме предоставленного текста, "
+                "сохраняя ключевые моменты и основные идеи."
+            ),
+            SummarizationType.BY_SPEAKERS: (
+                "Ты — профессиональный ассистент для анализа полилогов. "
+                "Для каждого спикера из предоставленного списка создай отдельное резюме "
+                "того, что этот спикер сказал или обсудил в тексте. "
+                'Верни результат в формате JSON: {"спикер1": "резюме1", "спикер2": "резюме2", ...}'
+            ),
+            SummarizationType.BY_TOPICS: (
+                "Ты — профессиональный ассистент для тематического анализа текста. "
+                "Для каждой темы из предоставленного списка извлеки и суммируй "
+                "информацию, связанную с этой темой. Если тема не упоминается в тексте, "
+                "не добавляй её в результат. Если ты не нашел ни одной темы, верни пустой JSON."
+                'Верни результат в формате JSON: {"тема1": "резюме1", "тема2": "резюме2", ...}'
+            ),
+            "RAG": (
+                "Ты — профессиональный ассистент, который отвечает на вопросы пользователя "
+                "на основе предоставленного контекста. Используй только информацию из контекста. "
+                "Если ответ не может быть найден в контексте, честно сообщи об этом.\n"
+                "ВАЖНЫЕ ПРАВИЛА\n:"
+                "- Отвечай ТОЛЬКО на основе информации из предоставленных документов\n"
+                "- Если информации недостаточно для ответа, явно укажи это\n"
+                "- Не используй внешние знания, если они не подтверждены контекстом\n"
+                "- Будь точен и конкретен в ответах."
+            ),
+        }
+
+    def make_rich_prompt(self, prompt: dict[str, str]) -> list[dict[str, str]]:
+        """Преобразует словарь промптов в формат сообщений OpenAI API.
+
+        Args:
+            prompt (dict[str, str]): Словарь с ключами "system" и "user".
+
+        Returns:
+            list[dict[str, str]]: Список сообщений в формате OpenAI API.
+        """
+        messages = []
+
+        if "system" in prompt:
+            messages.append({"role": "system", "content": prompt["system"]})
+
+        if "user" in prompt:
+            messages.append({"role": "user", "content": prompt["user"]})
+
+        return messages
+
     def _generate(
-        self, 
-        prompt: str, 
-        max_tokens: int | None = None,
-        temperature: float = 0.7
-    ) -> str:
-        """Внутренний метод для генерации через API."""
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=max_tokens or self.max_tokens,
-            temperature=temperature,
-        )
-        return response.choices[0].message.content.strip()
-
-    def summarize_text(self, text: str, max_length: int | None = None) -> str:
-        prompt = f"""Summarize the following text concisely:
-
-Text: {text}
-
-Summary:"""
-        return self._generate(prompt, max_length)
-
-    def summarize_dialogue_by_speakers(
-        self, 
-        dialogue: str, 
-        speakers: list[str],
-        max_length: int | None = None
-    ) -> dict[str, str]:
-        summaries = {}
-        for speaker in speakers:
-            prompt = f"""Summarize what {speaker} said in the following dialogue:
-                Dialogue:
-                {dialogue}
-
-                Summary of {speaker}'s contributions:"""
-            summaries[speaker] = self._generate(prompt, max_length)
-        return summaries
-
-    def summarize_by_topics(
         self,
-        text: str,
-        topics: list[str],
-        max_length: int | None = None
-    ) -> dict[str, str]:
-        summaries = {}
-        for topic in topics:
-            prompt = f"""Extract and summarize information about "{topic}" from the following text:
-
-                Text: {text}
-
-                Summary about {topic}:"""
-            summaries[topic] = self._generate(prompt, max_length)
-        return summaries
-
-    def find_untouched_topics(
-        self, 
-        text: str, 
-        expected_topics: list[str]
-    ) -> list[str]:
-        topics_str = ", ".join(expected_topics)
-        prompt = f"""Given the following text and list of topics, identify which topics were NOT discussed or mentioned.
-
-            Text: {text}
-
-            Expected topics: {topics_str}
-
-            List ONLY the topics that were NOT touched upon (comma-separated):"""
-        
-        response = self._generate(prompt, max_tokens=200)
-        untouched = [topic.strip() for topic in response.split(",")]
-        return [t for t in untouched if t in expected_topics]
-
-    def generate_with_rag(
-        self, 
-        query: str, 
-        retrieved_contexts: list[str],
-        max_length: int | None = None,
-        temperature: float = 0.7
+        prompt: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int | None = None,
     ) -> str:
-        contexts_text = "\n\n".join([f"[{i+1}] {ctx}" for i, ctx in enumerate(retrieved_contexts)])
-        
-        prompt = f"""Answer the question based on the following context information. Use only the information provided.
+        """Генерация ответа через OpenAI API.
 
-            Context:
-            {contexts_text}
+        Args:
+            prompt (list[dict[str, str]]): Список сообщений в формате OpenAI API
+            temperature (float): Параметр температуры для управления случайностью генерации
+                (0.0 - детерминированный, 1.0+ - более творческий).
+            max_tokens (int | None): Максимальная длина ответа в токенах. Defaults to None.
 
-            Question: {query}
+        Returns:
+            str: Результат генерации.
+        """
+        try:
+            response = self._client.chat.completions.create(
+                model=self.model_name,
+                messages=prompt,
+                max_tokens=max_tokens or self.max_tokens,
+                temperature=temperature,
+            )
+            return response.choices[0].message.content.strip()
 
-            Answer:"""
-        
-        return self._generate(prompt, max_length, temperature)
+        except Exception:  # pylint: disable=broad-exception-caught
+            self.logger.exception("Ошибка при генерации ответа.")
+            raise

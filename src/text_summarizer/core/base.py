@@ -11,7 +11,7 @@ from typing import Any, Literal, Self
 
 class SummarizationType(Enum):
     """Типы саммаризации.
-    
+
     Перечисление доступных режимов суммаризации текста.
     """
 
@@ -53,8 +53,11 @@ class SummarizationRequest:
 
     @classmethod
     def common_summary(
-        cls, summarization_type: Literal[SummarizationType.TEXT],
-        text: str, temperature: float = 0.5, max_length: int | None = None,
+        cls,
+        summarization_type: Literal[SummarizationType.TEXT],
+        text: str,
+        temperature: float = 0.5,
+        max_length: int | None = None,
     ) -> Self:
         """Создаёт запрос на обычную суммаризацию текста.
 
@@ -76,11 +79,14 @@ class SummarizationRequest:
             temperature=temperature,
             max_length=max_length,
         )
-    
+
     @classmethod
     def by_speakers(
-        cls, summarization_type: Literal[SummarizationType.BY_SPEAKERS],
-        text: str, speakers: list[str], temperature: float = 0.5, 
+        cls,
+        summarization_type: Literal[SummarizationType.BY_SPEAKERS],
+        text: str,
+        speakers: list[str],
+        temperature: float = 0.5,
         max_length: int | None = None,
     ) -> Self:
         """Создаёт запрос на суммаризацию текста по спикерам (или ведущим беседу
@@ -106,11 +112,14 @@ class SummarizationRequest:
             temperature=temperature,
             max_length=max_length,
         )
-    
+
     @classmethod
     def by_topics(
-        cls, summarization_type: Literal[SummarizationType.BY_TOPICS],
-        text: str, topics: list[str], temperature: float = 0.5,
+        cls,
+        summarization_type: Literal[SummarizationType.BY_TOPICS],
+        text: str,
+        topics: list[str],
+        temperature: float = 0.5,
         max_length: int | None = None,
     ) -> Self:
         """Создаёт запрос на суммаризацию текста по темам.
@@ -169,7 +178,10 @@ class BaseLLM(ABC):
 
     @abstractmethod
     def _generate(
-        self, prompt: Any, temperature: float, max_tokens: int | None,
+        self,
+        prompt: Any,
+        temperature: float,
+        max_tokens: int | None,
     ) -> str:
         """Генерации ответа LLM.
 
@@ -188,7 +200,7 @@ class BaseLLM(ABC):
 
         Args:
             request (SummarizationRequest): Объект запроса с параметрами саммаризации.
-            
+
         Returns:
             str | dict[str, str]: Результат суммаризации. При `SummarizationRequest.summarization_type`
                 - `SummarizationType.TEXT` - сгенерированный ответ (строка).
@@ -209,12 +221,12 @@ class BaseLLM(ABC):
             case SummarizationType.TEXT:
                 # В таком случае никаких дополнительных действий не нужно
                 pass
-        
+
             case SummarizationType.BY_SPEAKERS:
                 if not request.speakers:
                     raise ValueError("Не указаны спикеры для суммаризации.")
                 prompt_parts["user"] = f"Список спикеров: {request.speakers}.\n\n"
-            
+
             case SummarizationType.BY_TOPICS:
                 if not request.topics:
                     raise ValueError("Не указаны темы для суммаризации.")
@@ -231,8 +243,8 @@ class BaseLLM(ABC):
         )
 
     def generate_with_rag(
-        self, 
-        query: str, 
+        self,
+        query: str,
         retrieved_contexts: list[str],
         temperature: float,
         max_length: int | None = None,
@@ -246,7 +258,7 @@ class BaseLLM(ABC):
                 (0.0 - детерминированный, 1.0+ - более творческий).
             max_length (int | None): Максимальная длина генерируемого ответа в токенах.
                 Defaults to None.
-            
+
         Returns:
             str: Сгенерированный ответ на основе предоставленного контекста.
         """
@@ -260,10 +272,9 @@ class BaseLLM(ABC):
             )
         prompt_parts["system"] = system_prompt
 
-        context_text = "\n".join([
-            f"[Документ {i+1}]:\n{ctx}" 
-            for i, ctx in enumerate(retrieved_contexts)
-        ])
+        context_text = "\n".join(
+            [f"[Документ {i + 1}]:\n{ctx}" for i, ctx in enumerate(retrieved_contexts)]
+        )
         prompt_parts["user"] = f"КОНТЕКСТ:\n{context_text}\n\nВОПРОС ПОЛЬЗОВАТЕЛЯ:\n{query}"
 
         full_prompt = self.make_rich_prompt(prompt_parts)
