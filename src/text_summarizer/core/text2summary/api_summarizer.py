@@ -37,7 +37,7 @@ class OpenAILLM(BaseLLM):
     @property
     def summary_type2prompt(self) -> dict[SummarizationType | Literal["RAG"], str]:
         """Маппинг типов суммаризации на системные промпты."""
-        # TODO вынести промпты в pydantic модели
+        # TODO вынести промпты в pydantic модели + вынести в родительский класс промпты, если они будут в конфигах
         # TODO сделать fallback на запрос отдельно по спикерам, если общий json не валидный
         return {
             SummarizationType.TEXT: (
@@ -70,7 +70,7 @@ class OpenAILLM(BaseLLM):
             ),
         }
 
-    def make_rich_prompt(self, prompt: dict[str, str]) -> list[dict[str, str]]:
+    def _make_rich_prompt(self, prompt: dict[str, str]) -> list[dict[str, str]]:
         """Преобразует словарь промптов в формат сообщений OpenAI API.
 
         Args:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -163,7 +164,7 @@ class BaseLLM(ABC):
         """
 
     @abstractmethod
-    def make_rich_prompt(self, prompt: dict[str, str]) -> Any:
+    def _make_rich_prompt(self, prompt: dict[str, str]) -> Any:
         """Преобразует готовые промпты для LLM из словарей таким образом,
         чтобы используемая модель поддерживала ввод.
 
@@ -210,10 +211,21 @@ class BaseLLM(ABC):
                     словарь вида {тема: результат суммаризации}.
         """
 
+        self.logger.debug(
+            "Запрос на суммаризацию типа '%s', длина текста: %d символов, temperature=%.2f",
+            request.summarization_type.name,
+            len(request.text),
+            request.temperature,
+        )
+
         prompt_parts: dict[str, str] = {}
         system_prompt = self.summary_type2prompt.get(request.summarization_type)
 
         if system_prompt is None:
+            self.logger.error(
+                "Маппинг типа запроса '%s' к промптам не определен",
+                request.summarization_type.name,
+            )
             raise RuntimeError("Маппинга типов запроса к промптам не был определен.")
         prompt_parts["system"] = system_prompt
 
@@ -235,12 +247,22 @@ class BaseLLM(ABC):
         user_prompt = prompt_parts.get("user", "")
         prompt_parts["user"] = user_prompt + request.text
 
-        full_prompt = self.make_rich_prompt(prompt_parts)
-        return self._generate(
+        full_prompt = self._make_rich_prompt(prompt_parts)
+
+        start = time.perf_counter_ns()
+        result = self._generate(
             full_prompt,
             request.temperature,
             request.max_length,
         )
+        end = time.perf_counter_ns()
+
+        self.logger.debug(
+            "Суммаризация завершена за %.3f секунд, результат: %d символов",
+            (end - start) / 1e9,
+            len(result) if isinstance(result, str) else sum(len(v) for v in result.values()),
+        )
+        return result
 
     def generate_with_rag(
         self,
@@ -263,6 +285,13 @@ class BaseLLM(ABC):
             str: Сгенерированный ответ на основе предоставленного контекста.
         """
 
+        self.logger.debug(
+            "Запрос в RAG: %d документов, длина запроса: %d символов, temperature=%.2f",
+            len(retrieved_contexts),
+            len(query),
+            temperature,
+        )
+
         prompt_parts: dict[str, str] = {}
         system_prompt = self.summary_type2prompt.get("RAG")
 
@@ -277,9 +306,19 @@ class BaseLLM(ABC):
         )
         prompt_parts["user"] = f"КОНТЕКСТ:\n{context_text}\n\nВОПРОС ПОЛЬЗОВАТЕЛЯ:\n{query}"
 
-        full_prompt = self.make_rich_prompt(prompt_parts)
-        return self._generate(
+        full_prompt = self._make_rich_prompt(prompt_parts)
+
+        start = time.perf_counter_ns()
+        answer = self._generate(
             full_prompt,
             temperature,
             max_length,
         )
+        end = time.perf_counter_ns()
+
+        self.logger.debug(
+            "RAG ответ сгенерирован за %.3f секунд, длина ответа: %d символов",
+            (end - start) / 1e9,
+            len(answer),
+        )
+        return answer
