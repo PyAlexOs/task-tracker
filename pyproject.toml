@@ -3,7 +3,7 @@ name = "task-tracker"
 version = "0.1.0"
 description = "Приложение для распознавания переговоров и их суммаризации, а также отслеживания статусов задач в рабочих чатах."
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = "==3.12.*"
 dependencies = [
     "aio-pika>=9.5.8",
     "pydantic>=2.12.3",
@@ -26,17 +26,14 @@ similarity = [
 ]
 
 speech-transcriptor = [
-    "nemo>=7.2.5",
-    "nemo-toolkit[asr]>=2.1.0",
     "noisereduce>=3.0.3",
     "numpy>=2.2.6",
     "openai-whisper>=20250625",
     "pandas>=2.3.3",
-    "pyannote-audio>=4.0",
+    "pyannote-audio>=4.0.1",
     "pydub>=0.25.1",
-    "scipy>=1.16.3",
-    "torchaudio>=2.8.0,<2.9.0",
-    "whisperx>=3.4.3",
+    "scipy>=1.15.3",
+    "torch>=2.9.0",
 ]
 
 text-summarizer = [
@@ -46,4 +43,13 @@ text-summarizer = [
 
 user-connectors = [
 
+]
+
+dev = [
+    "dotenv>=0.9.9",
+    "ipykernel>=7.1.0",
+    "mypy>=1.19.0",
+    "nbstripout>=0.8.2",
+    "pre-commit>=4.5.0",
+    "ruff>=0.14.7",
 ]
