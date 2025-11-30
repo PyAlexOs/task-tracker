@@ -40,6 +40,16 @@ type ModelName = Literal[
 
 @dataclass
 class TranscriptionWord:
+    """Представляет отдельное слово в транскрипции речи с временными метками и метаданными.
+    
+    Attributes:
+        start (float): Время начала слова в секундах от начала аудиозаписи.
+        end (float): Время окончания слова в секундах от начала аудиозаписи.
+        text (str): Транскрибированный текст слова.
+        speaker (str | None): Опциональный идентификатор говорящего, произнёсшего это слово.
+        probs (float | None): Опциональная оценка вероятности правильности распознавания слова.
+    """
+
     start: float
     end: float
     text: str
@@ -49,6 +59,18 @@ class TranscriptionWord:
 
 @dataclass
 class TranscriptionSegment:
+    """Представляет сегмент транскрибированной речи, содержащий несколько слов.
+    
+    Сегмент обычно представляет непрерывное высказывание или фразу с информацией
+    о временных границах и детализацией на уровне отдельных слов.
+    
+    Attributes:
+        start (float): Время начала сегмента в секундах от начала аудиозаписи.
+        end (float): Время окончания сегмента в секундах от начала аудиозаписи.
+        text (str): Полный транскрибированный текст сегмента.
+        words (list[TranscriptionWord]): Список объектов слов с детальной информацией о времени и метаданных.
+    """
+
     start: float
     end: float
     text: str
@@ -195,8 +217,30 @@ class SpeechTranscriptor:
         )
         return target_sample_rate, audio_data
     
-    def _get_noise_sample(self, audio_data: NDArray[Any], rate: int, total_duration: float = 2.0) -> NDArray[Any]:
-        """Берет шумовые sample из нескольких частей файла."""
+    def _get_noise_sample(
+        self, audio_data: NDArray[Any], rate: int,
+    ) -> NDArray[Any]:
+        """Извлекает шумовые сэмплы из нескольких частей аудиофайла для профилирования шума.
+    
+        Функция берет фрагменты аудио из начала, середины (если файл достаточно длинный) 
+        и конца записи, предполагая, что в этих участках может содержаться фоновый шум 
+        без речи. Извлеченные фрагменты объединяются для последующего анализа шумовой 
+        характеристики аудио.
+        
+        Args:
+            audio_data (NDArray[Any]): Массив с аудиоданными (сырые сэмплы).
+            rate (int): Частота дискретизации аудио в Гц (samples per second).
+        
+        Returns:
+            NDArray[Any]: Массив с объединенными шумовыми сэмплами. Если удалось 
+                извлечь фрагменты из начала/середины/конца, возвращает их конкатенацию.
+                Если извлечь не удалось, возвращает первую секунду аудио.
+        
+        NOTE:
+            - Из начала берется до 0.5 секунды (но не более 1/10 от общей длины файла)
+            - Из середины берется 1 секунда (если файл длиннее 10 секунд)
+            - Из конца берется до 0.5 секунды (но не более 1/10 от общей длины файла)
+        """
         n_samples = len(audio_data)
         noise_samples = []
         
@@ -354,20 +398,10 @@ class SpeechTranscriptor:
         
         if audio_data.ndim != 1:
             raise ValueError(f"Неподдерживаемая форма аудио: {audio_data.shape}")
-        
-        n_samples = len(audio_data)
-        if n_samples == 0:
+
+        if len(audio_data) == 0:
             raise ValueError("Пустой WAV-файл, нечего обрабатывать")
 
-        # Берем максимум между указанным временем и минимум 1 секундой
-        min_noise_samples = max(int(noise_sample_sec * rate), rate)  # минимум 1 секунда
-        # Но не больше 20% файла (вместо 10%)
-        max_noise_samples = n_samples // 5
-        noise_sample_len = min(min_noise_samples, max_noise_samples)
-
-        # Fallback для очень коротких файлов
-        if noise_sample_len <= 0:
-            noise_sample_len = min(n_samples, rate // 2)  # 0.5 секунды
         noise_sample = self._get_noise_sample(audio_data, rate)
 
         reduced = nr.reduce_noise(
@@ -406,9 +440,7 @@ class SpeechTranscriptor:
         return rate, denoised_int16
 
     def transcribe(
-        self,
-        audio_path: str | Path,
-        language: str | None = None,
+        self, audio_path: str | Path, language: str | None = None,
     ) -> list[TranscriptionSegment]:
         """Транскрибирует аудиофайл в список текстовых сегментов.
 
@@ -514,9 +546,7 @@ class SpeechTranscriptor:
         return pd.DataFrame(segments)
     
     def assign_word_speakers(
-        self,
-        diarization_df: pd.DataFrame,
-        asr_result: dict[str, Any],
+        self, diarization_df: pd.DataFrame, asr_result: dict[str, Any],
     ) -> dict[str, Any]:
         """Назначает каждому слову в результате ASR идентификатор спикера по данным диаризации.
 
