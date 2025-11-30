@@ -18,6 +18,7 @@ api-gateway = [
 ]
 
 canban-connectors = [
+    "kaiten>=1.0.0",
     "py-trello>=0.20.1",
 ]
 

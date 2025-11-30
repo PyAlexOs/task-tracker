@@ -1,283 +1,223 @@
+"""Интерфейс базового коннектора к канбан-доске."""
+
+import logging
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
-from typing import Any, TypeVar
-
-# ========== Абстрактные базовые классы ==========
+from datetime import datetime
+from typing import Any
 
 
-class CardData(ABC):
-    """Абстрактный тип, обозначающий представление карточки канбан-доски.
+class KanbanBoardBase(ABC):
+    """Абстрактный интерфейс для работы с канбан-досками."""
 
-    Конкретные реализации коннекторов могут использовать свои датаклассы / Pydantic‑модели,
-    которые наследуются от этого абстрактного типа.
-    """
+    def __init__(self, **kwargs: Any):
+        """Конструктор класса."""
 
-    @abstractmethod
-    def get_id(self) -> str:
-        """Получить ID карточки."""
-
-
-TCardData = TypeVar("TCardData", bound=CardData)
-
-
-class KanbanBoardCRUD(ABC):
-    """Абстрактный интерфейс операций с канбан‑досками и карточками."""
-
-    # --------- Базовые CRUD по карточкам ---------
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     @abstractmethod
-    def list_cards(self, board_id: str, list_id: str | None = None) -> list[CardData]:
-        """Получить список карточек доски или конкретной колонки.
+    def get_all_boards(self) -> list[dict[str, Any]]:
+        """Получить список всех досок, доступных пользователю.
+
+        Returns:
+            list[dict[str, Any]]: Список словарей с информацией о досках. Каждый словарь содержит
+                базовые поля доски (id, name, url и т.д.).
+
+        Raises:
+            Exception: При ошибке получения данных от API.
+        """
+
+    @abstractmethod
+    def get_board_id_by_name(self, board_name: str) -> str | None:
+        """Получить ID доски по её названию.
 
         Args:
-            board_id: ID доски
-            list_id: ID колонки (если None, возвращаются карточки всей доски)
+            board_name (str): Название доски для поиска.
+
+        Returns:
+            str | None: ID доски, если доска найдена, иначе None.
+
+        Raises:
+            Exception: При ошибке получения данных от API.
+        """
+
+    @abstractmethod
+    def get_all_cards(self, board_id: str) -> list[dict[str, Any]]:
+        """Получить список всех карточек на доске.
+
+        Args:
+            board_id (str): Уникальный идентификатор доски.
+
+        Returns:
+            list[dict[str, Any]]: Список словарей с информацией о карточках. Каждый словарь содержит
+                базовые поля карточки (id, name, list_id и т.д.).
+
+        Raises:
+            Exception: При ошибке получения данных от API.
+        """
+
+    @abstractmethod
+    def get_board_lists(self, board_id: str) -> list[dict[str, Any]]:
+        """Получить список всех столбцов (листов) на доске.
+
+        Args:
+            board_id (str): Уникальный идентификатор доски.
+
+        Returns:
+            list[dict[str, Any]]: Список словарей с информацией о столбцах. Каждый словарь содержит
+                поля столбца (id, name, position и т.д.).
+
+        Raises:
+            Exception: При ошибке получения данных от API.
+        """
+
+    @abstractmethod
+    def get_board_labels(self, board_id: str) -> list[dict[str, Any]]:
+        """Получить список всех меток, доступных на доске.
+
+        Args:
+            board_id (str): Уникальный идентификатор доски.
+
+        Returns:
+            list[dict[str, Any]]: Список словарей с информацией о метках. Каждый словарь содержит
+                поля метки (id, name, color и т.д.).
+
+        Raises:
+            Exception: При ошибке получения данных от API.
+        """
+
+    @abstractmethod
+    def get_board_members(self, board_id: str) -> list[dict[str, Any]]:
+        """Получить список всех участников доски.
+
+        Args:
+            board_id (str): Уникальный идентификатор доски.
+
+        Returns:
+            list[dict[str, Any]]: Список словарей с информацией об участниках.
+                Каждый словарь содержит поля пользователя (id, username, full_name и т.д.).
+
+        Raises:
+            Exception: При ошибке получения данных от API.
+        """
+
+    @abstractmethod
+    def get_card_details(self, card_id: str) -> dict[str, Any]:
+        """Получить подробную информацию о карточке.
+
+        Args:
+            card_id (str): Уникальный идентификатор карточки.
+
+        Returns:
+            dict[str, Any]: Словарь с полной информацией о карточке, включающий название,
+                описание, столбец, ответственных, метки, чек-листы, даты и комментарии.
+
+        Raises:
+            Exception: При ошибке получения данных от API.
         """
 
     @abstractmethod
     def create_card(
         self,
-        board_id: str,
         list_id: str,
         name: str,
         description: str | None = None,
-        members: Iterable[str] | None = None,
-        labels: Iterable[str] | None = None,
-        due_date: str | None = None,
-        position: str | int | None = None,
-    ) -> CardData:
-        """Создать новую карточку в указанной колонке.
+        labels: list[str] | None = None,
+        members: list[str] | None = None,
+        due_date: datetime | None = None,
+        checklist_items: dict[str, list[str]] | None = None,
+    ) -> dict[str, Any]:
+        """Создать новую карточку с указанными полями.
 
         Args:
-            board_id: ID доски
-            list_id: ID колонки
-            name: Название карточки
-            description: Описание карточки
-            members: ID участников для назначения
-            labels: ID меток
-            due_date: Срок выполнения
-            position: Позиция ('top', 'bottom' или число)
+            list_id (str): ID столбца, в котором создается карточка.
+            name (str): Название карточки.
+            description (str | None): Описание карточки. Defaults to None.
+            labels (list[str] | None): Список ID меток для карточки. Defaults to None.
+            members (list[str] | None): Список ID ответственных пользователей. Defaults to None.
+            due_date (datetime | None): Срок выполнения карточки. Defaults to None.
+            checklist_items (dict[str, list[str]] | None): Словарь чек-листов в формате
+                {название_чеклиста: [пункт1, пункт2, ...]}. Defaults to None.
+
+        Returns:
+            dict[str, Any]: Словарь с информацией о созданной карточке (id, name, url и т.д.).
+
+        Raises:
+            Exception: При ошибке создания карточки.
         """
 
     @abstractmethod
-    def read_card(self, card_id: str) -> CardData | None:
-        """Получить карточку по ID.
+    def move_card_to_list(self, card_id: str, list_id: str) -> bool:
+        """Переместить карточку в другой столбец.
 
         Args:
-            card_id: ID карточки
+            card_id (str): ID карточки для перемещения.
+            list_id (str): ID целевого столбца.
+
+        Returns:
+            bool: True, если перемещение прошло успешно, иначе False.
+
+        Raises:
+            Exception: При ошибке перемещения карточки.
         """
 
     @abstractmethod
-    def update_card(
+    def add_member_to_card(self, card_id: str, member_id: str) -> bool:
+        """Добавить ответственного к карточке.
+
+        Args:
+            card_id (str): ID карточки.
+            member_id (str): ID пользователя, которого нужно добавить как ответственного.
+
+        Returns:
+            bool: True, если добавление прошло успешно, иначе False.
+
+        Raises:
+            Exception: При ошибке добавления ответственного.
+        """
+
+    @abstractmethod
+    def add_comment(self, card_id: str, comment_text: str) -> bool:
+        """Написать комментарий к карточке.
+
+        Args:
+            card_id (str): ID карточки.
+            comment_text (str): Текст комментария.
+
+        Returns:
+            bool: True, если комментарий добавлен успешно, иначе False.
+
+        Raises:
+            Exception: При ошибке добавления комментария.
+        """
+
+    @abstractmethod
+    def modify_checklist(
         self,
         card_id: str,
-        name: str | None = None,
-        description: str | None = None,
-        closed: bool | None = None,
-    ) -> CardData:
-        """Обновить базовые поля карточки.
-
-        Args:
-            card_id: ID карточки
-            name: Новое название
-            description: Новое описание
-            closed: Статус закрытия (архивирования)
-        """
-
-    @abstractmethod
-    def delete_card(self, card_id: str) -> bool:
-        """Удалить карточку по ID.
-
-        Args:
-            card_id: ID карточки
-
-        Returns:
-            True, если карточка была удалена
-        """
-
-    # --------- Название и описание ---------
-
-    @abstractmethod
-    def get_card_name(self, card: CardData) -> str:
-        """Получить название карточки."""
-
-    @abstractmethod
-    def set_card_name(self, card_id: str, name: str) -> None:
-        """Установить название карточки."""
-
-    @abstractmethod
-    def get_card_description(self, card: CardData) -> str | None:
-        """Получить описание карточки."""
-
-    @abstractmethod
-    def set_card_description(self, card_id: str, description: str | None) -> None:
-        """Установить описание карточки."""
-
-    # --------- Колонка (лист) карточки ---------
-
-    @abstractmethod
-    def get_card_list_id(self, card: CardData) -> str:
-        """Получить ID колонки (листа), в которой сейчас находится карточка."""
-
-    @abstractmethod
-    def set_card_list(self, card_id: str, list_id: str) -> None:
-        """Переместить карточку в другую колонку."""
-
-    # --------- Ответственные ---------
-
-    @abstractmethod
-    def get_card_members(self, card: CardData) -> list[str]:
-        """Получить список ID всех ответственных (участников) карточки."""
-
-    @abstractmethod
-    def get_card_main_member(self, card: CardData) -> str | None:
-        """Получить ID главного ответственного.
-
-        Возвращает первого участника из списка или None.
-        """
-
-    @abstractmethod
-    def add_card_member(self, card_id: str, member_id: str) -> None:
-        """Добавить участника к карточке."""
-
-    @abstractmethod
-    def remove_card_member(self, card_id: str, member_id: str) -> None:
-        """Удалить участника из карточки."""
-
-    @abstractmethod
-    def set_card_members(self, card_id: str, member_ids: Iterable[str]) -> None:
-        """Заменить список ответственных полностью."""
-
-    # --------- Метки (Labels) ---------
-
-    @abstractmethod
-    def get_card_labels(self, card: CardData) -> list[str]:
-        """Получить список ID меток карточки."""
-
-    @abstractmethod
-    def add_card_label(self, card_id: str, label_id: str) -> None:
-        """Добавить метку к карточке."""
-
-    @abstractmethod
-    def remove_card_label(self, card_id: str, label_id: str) -> None:
-        """Удалить метку с карточки."""
-
-    # --------- Чек‑листы ---------
-
-    @abstractmethod
-    def get_card_checklists(self, card: CardData) -> list[dict[str, Any]]:
-        """Получить чек‑листы карточки.
-
-        Возвращает список словарей с информацией о чек-листах.
-        Формат: [{'id': str, 'name': str, 'items': [{'id': str, 'name': str, 'checked': bool}]}]
-        """
-
-    @abstractmethod
-    def add_checklist(
-        self,
-        card_id: str,
-        name: str,
-        items: Iterable[tuple[str, bool]] | None = None,
-    ) -> str:
-        """Создать чек‑лист с опциональными пунктами.
-
-        Args:
-            card_id: ID карточки
-            name: Название чек-листа
-            items: Список кортежей (название_пункта, выполнен)
-
-        Returns:
-            ID созданного чек-листа
-        """
-
-    @abstractmethod
-    def add_checklist_item(
-        self,
-        checklist_id: str,
-        name: str,
-        checked: bool = False,
-    ) -> str:
-        """Добавить пункт в чек-лист.
-
-        Returns:
-            ID созданного пункта
-        """
-
-    @abstractmethod
-    def update_checklist_item(
-        self,
-        checklist_id: str,
-        item_id: str,
-        name: str | None = None,
+        checklist_name: str,
+        item_name: str | None = None,
+        add_item: bool = False,  # TODO может быть здесь это не нужно, можно просто сначала смотреть наличие
         checked: bool | None = None,
-    ) -> None:
-        """Обновить пункт чек-листа."""
+    ) -> bool:
+        """Изменить чек-лист карточки.
 
-    @abstractmethod
-    def delete_checklist(self, checklist_id: str) -> None:
-        """Удалить чек‑лист."""
-
-    # --------- Комментарии ---------
-
-    @abstractmethod
-    def get_card_comments(self, card: CardData) -> list[dict[str, Any]]:
-        """Получить список комментариев карточки.
-
-        Формат: [{'id': str, 'text': str, 'date': str, 'member_id': str}]
-        """
-
-    @abstractmethod
-    def add_comment(self, card_id: str, text: str) -> str:
-        """Добавить комментарий к карточке.
-
-        Returns:
-            ID созданного комментария
-        """
-
-    @abstractmethod
-    def update_comment(self, card_id: str, comment_id: str, text: str) -> None:
-        """Обновить текст комментария."""
-
-    @abstractmethod
-    def delete_comment(self, card_id: str, comment_id: str) -> None:
-        """Удалить комментарий."""
-
-    # --------- Списки (колонки) ---------
-
-    @abstractmethod
-    def list_lists(self, board_id: str) -> list[dict[str, Any]]:
-        """Получить все списки (колонки) доски.
-
-        Формат: [{'id': str, 'name': str, 'closed': bool, 'pos': float}]
-        """
-
-    @abstractmethod
-    def create_list(self, board_id: str, name: str, position: str | None = None) -> str:
-        """Создать новую колонку на доске.
+        Метод позволяет добавить новый пункт в чек-лист или изменить статус
+        существующего пункта (отметить как выполненный/невыполненный).
 
         Args:
-            board_id: ID доски
-            name: Название колонки
-            position: Позиция ('top', 'bottom')
+            card_id (str): ID карточки.
+            checklist_name (str): Название чек-листа.
+            item_name (str | None): Название пункта чек-листа. Defaults to None.
+            add_item (bool): Флаг добавления нового пункта. Если True, то создается
+                новый пункт с названием item_name. Если False, то изменяется
+                статус существующего пункта. Defaults to False.
+            checked (bool | None): Статус выполнения пункта - True (выполнен) или
+                False (не выполнен). Используется только при изменении
+                существующего пункта (опционально).
 
         Returns:
-            ID созданной колонки
+            bool: True, если операция прошла успешно, иначе False.
+
+        Raises:
+            Exception: При ошибке изменения чек-листа.
         """
-
-    # --------- Удобные хелперы ---------
-
-    def move_card(self, card_id: str, dst_list_id: str) -> None:
-        """Более говорящий синоним set_card_list."""
-        self.set_card_list(card_id, dst_list_id)
-
-    def rename_card(self, card_id: str, new_name: str) -> None:
-        """Переименовать карточку."""
-        self.set_card_name(card_id, new_name)
-
-    def archive_card(self, card_id: str) -> None:
-        """Архивировать карточку (закрыть)."""
-        self.update_card(card_id, closed=True)
-
-    def unarchive_card(self, card_id: str) -> None:
-        """Разархивировать карточку (открыть)."""
-        self.update_card(card_id, closed=False)

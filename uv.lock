@@ -1182,6 +1182,18 @@ wheels = [
 ]
 
 [[package]]
+name = "kaiten"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/65/33/fc6bd765bbb0d495093d8180ec80e37d79c20fd64098c60aa77543999ac4/kaiten-1.0.0.tar.gz", hash = "sha256:21afc64ce94cb38e192bb9ed2a2d253355ab18d94b6bfaa6550e3b02123ccbf4", size = 17207, upload-time = "2023-07-10T00:13:24.604Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/96/bc/47f5b48caaa9689d67a41095b18e824cc5cb531c5fb22c13b1a6107fc53a/kaiten-1.0.0-py3-none-any.whl", hash = "sha256:7b2daf0f608b5a1b57a4adb82a871d13b5534c9981a5959c5fad5d6c59403330", size = 19282, upload-time = "2023-07-10T00:13:22.825Z" },
+]
+
+[[package]]
 name = "kiwisolver"
 version = "1.4.9"
 source = { registry = "https://pypi.org/simple" }
@@ -3221,6 +3233,7 @@ api-gateway = [
     { name = "uvicorn" },
 ]
 canban-connectors = [
+    { name = "kaiten" },
     { name = "py-trello" },
 ]
 dev = [
@@ -3252,6 +3265,7 @@ requires-dist = [
     { name = "dotenv", marker = "extra == 'dev'", specifier = ">=0.9.9" },
     { name = "fastapi", marker = "extra == 'api-gateway'", specifier = ">=0.120.1" },
     { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=7.1.0" },
+    { name = "kaiten", marker = "extra == 'canban-connectors'", specifier = ">=1.0.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.19.0" },
     { name = "nbstripout", marker = "extra == 'dev'", specifier = ">=0.8.2" },
     { name = "noisereduce", marker = "extra == 'speech-transcriptor'", specifier = ">=3.0.3" },
