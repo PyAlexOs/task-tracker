@@ -1,9 +1,17 @@
+"""Модуль, содержащий базовую функциональность для конвертации аудиофайлов в необходимый формат,
+удаления шумов, транскрибации и диаризации аудио.
+"""
+
 from src.speech_transcriptor.core.base import (
-    BaseSpeechRecognizer,
+    ModelName,
+    SpeechTranscriptor,
     TranscriptionSegment,
+    TranscriptionWord,
 )
 
 __all__ = [
-    "BaseSpeechRecognizer",
+    "ModelName",
+    "SpeechTranscriptor",
     "TranscriptionSegment",
+    "TranscriptionWord",
 ]
