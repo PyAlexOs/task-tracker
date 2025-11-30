@@ -62,7 +62,7 @@ class TranscriptionWord:
 @dataclass
 class TranscriptionSegment:
     """Представляет сегмент транскрибированной речи, содержащий несколько слов.
-    
+
     Сегмент обычно представляет непрерывное высказывание или фразу с информацией
     о временных границах и детализацией на уровне отдельных слов.
     """
@@ -173,7 +173,6 @@ class SpeechTranscriptor:
         target_sample_rate: int = 16000,
         save_to_disk: bool = False,
     ) -> Path | tuple[int, NDArray[Any]]:
-
         audio_path = Path(audio_path)
         self.logger.debug(
             "Конвертация аудио: %s (target_sr=%d, save_to_disk=%s)",
@@ -195,9 +194,7 @@ class SpeechTranscriptor:
                 output_path = Path(output_path)
 
             audio_segment.export(output_path, format="wav")
-            self.logger.debug(
-                "Конвертация завершена. Результат сохранён в файл: %s", output_path
-            )
+            self.logger.debug("Конвертация завершена. Результат сохранён в файл: %s", output_path)
             return output_path
 
         # В память: pydub хранит в sample_width байт на сэмпл
@@ -219,26 +216,28 @@ class SpeechTranscriptor:
             len(audio_data),
         )
         return target_sample_rate, audio_data
-    
+
     def _get_noise_sample(
-        self, audio_data: NDArray[Any], rate: int,
+        self,
+        audio_data: NDArray[Any],
+        rate: int,
     ) -> NDArray[Any]:
         """Извлекает шумовые сэмплы из нескольких частей аудиофайла для профилирования шума.
-    
-        Функция берет фрагменты аудио из начала, середины (если файл достаточно длинный) 
-        и конца записи, предполагая, что в этих участках может содержаться фоновый шум 
-        без речи. Извлеченные фрагменты объединяются для последующего анализа шумовой 
+
+        Функция берет фрагменты аудио из начала, середины (если файл достаточно длинный)
+        и конца записи, предполагая, что в этих участках может содержаться фоновый шум
+        без речи. Извлеченные фрагменты объединяются для последующего анализа шумовой
         характеристики аудио.
-        
+
         Args:
             audio_data (NDArray[Any]): Массив с аудиоданными (сырые сэмплы).
             rate (int): Частота дискретизации аудио в Гц (samples per second).
-        
+
         Returns:
-            NDArray[Any]: Массив с объединенными шумовыми сэмплами. Если удалось 
+            NDArray[Any]: Массив с объединенными шумовыми сэмплами. Если удалось
                 извлечь фрагменты из начала/середины/конца, возвращает их конкатенацию.
                 Если извлечь не удалось, возвращает первую секунду аудио.
-        
+
         NOTE:
             - Из начала берется до 0.5 секунды (но не более 1/10 от общей длины файла)
             - Из середины берется 1 секунда (если файл длиннее 10 секунд)
@@ -246,28 +245,28 @@ class SpeechTranscriptor:
         """
         n_samples = len(audio_data)
         noise_samples = []
-        
+
         # Берем из начала (первые 0.5 сек)
         start_samples = min(int(0.5 * rate), n_samples // 10)
         if start_samples > 0:
             noise_samples.append(audio_data[:start_samples])
-        
+
         # Берем из середины (если файл достаточно длинный)
         if n_samples > 10 * rate:  # Если больше 10 секунд
             mid_start = n_samples // 2 - int(0.5 * rate)
             mid_end = n_samples // 2 + int(0.5 * rate)
             if mid_end < n_samples:
                 noise_samples.append(audio_data[mid_start:mid_end])
-        
+
         # Берем из конца (последние 0.5 сек)
         end_samples = min(int(0.5 * rate), n_samples // 10)
         if end_samples > 0:
             noise_samples.append(audio_data[-end_samples:])
-        
+
         if noise_samples:
             return np.concatenate(noise_samples)
         else:
-            return audio_data[:min(int(1.0 * rate), n_samples)]
+            return audio_data[: min(int(1.0 * rate), n_samples)]
 
     @overload
     def _reduce_noise_in_audio(
@@ -363,7 +362,6 @@ class SpeechTranscriptor:
         noise_sample_sec: float = 0.5,
         save_to_disk: bool = True,
     ) -> Path | tuple[int, NDArray[Any]]:
-        
         if not wav_path and not wav_array:
             raise RuntimeError(
                 "Не передано ни пути к файлу .wav, ни представления звука в виде массива."
@@ -392,13 +390,13 @@ class SpeechTranscriptor:
             audio_data = data.astype(np.float32)
         else:
             raise ValueError(f"Неизвестный формат данных аудио: {data.dtype}")
-        
+
         # Для моно: (N,) -> оставляем как есть
         # Для стерео: (N, C) -> берем только первый канал
         if audio_data.ndim == 2:
             self.logger.debug("Многоканальное аудио, извлекается первый канал")
             audio_data = audio_data[:, 0]
-        
+
         if audio_data.ndim != 1:
             raise ValueError(f"Неподдерживаемая форма аудио: {audio_data.shape}")
 
@@ -443,7 +441,9 @@ class SpeechTranscriptor:
         return rate, denoised_int16
 
     def transcribe(
-        self, audio_path: str | Path, language: str | None = None,
+        self,
+        audio_path: str | Path,
+        language: str | None = None,
     ) -> list[TranscriptionSegment]:
         """Транскрибирует аудиофайл в список текстовых сегментов.
 
@@ -479,7 +479,8 @@ class SpeechTranscriptor:
                     # speaker и probs могут быть добавлены позже
                     speaker=w.get("speaker"),
                     probs=w.get("probability"),
-                ) for w in seg.get("words", [])
+                )
+                for w in seg.get("words", [])
             ]
 
             segments.append(
@@ -547,9 +548,11 @@ class SpeechTranscriptor:
 
         self.logger.debug("Обнаружено %d сегментов диаризации", len(segments))
         return pd.DataFrame(segments)
-    
+
     def assign_word_speakers(
-        self, diarization_df: pd.DataFrame, asr_result: dict[str, Any],
+        self,
+        diarization_df: pd.DataFrame,
+        asr_result: dict[str, Any],
     ) -> dict[str, Any]:
         """Назначает каждому слову в результате ASR идентификатор спикера по данным диаризации.
 

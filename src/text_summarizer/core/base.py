@@ -1,172 +1,274 @@
+"""Интерфейс базовой обёртки LLM и запросов на суммаризацию, RAG."""
+
+from __future__ import annotations
+
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any
+from enum import Enum, auto
+from typing import Any, Literal, Self
 
 
 class SummarizationType(Enum):
-    """Типы саммаризации."""
+    """Типы саммаризации.
+    
+    Перечисление доступных режимов суммаризации текста.
+    """
 
-    TEXT = "text"
-    DIALOGUE_BY_SPEAKERS = "dialogue_by_speakers"
-    BY_TOPICS = "by_topics"
-    UNTOUCHED_TOPICS = "untouched_topics"
+    TEXT = auto()
+    """Стандартная суммаризация текста, как одного целого."""
+
+    BY_SPEAKERS = auto()
+    """Суммаризация текста по спикерам (или ведущим беседу в текстовом виде пользователям).
+    По сути является набором запросов на суммаризацию - для каждого спикера отдельно.
+    """
+
+    BY_TOPICS = auto()
+    """Суммаризация текста по темам (задчам). Для такого вида суммаризации
+    необходим также список задач обсуждаемой канбан-доски.
+    """
 
 
 @dataclass
 class SummarizationRequest:
     """Запрос на саммаризацию."""
 
-    text: str
     summarization_type: SummarizationType
-    speakers: list[str] | None = None  # Для DIALOGUE_BY_SPEAKERS
-    topics:list[str] | None = None  # Для BY_TOPICS и UNTOUCHED_TOPICS
+    """Тип саммаризации."""
+
+    text: str
+    """Исходный текст для саммаризации."""
+
+    speakers: list[str] | None = None
+    """Список спикеров для режима DIALOGUE_BY_SPEAKERS."""
+
+    topics: list[str] | None = None
+    """Список тем для режимов BY_TOPICS."""
+
     max_length: int | None = None
+    """Максимальная длина саммаризации в токенах или символах."""
 
+    temperature: float = 0.5
+    """Параметр температуры для управления случайностью генерации (0.0 - детерминированный, 1.0+ - более творческий)"""
 
-@dataclass
-class RAGRequest:
-    """Запрос для RAG генерации."""
+    @classmethod
+    def common_summary(
+        cls, summarization_type: Literal[SummarizationType.TEXT],
+        text: str, temperature: float = 0.5, max_length: int | None = None,
+    ) -> Self:
+        """Создаёт запрос на обычную суммаризацию текста.
 
-    query: str
-    retrieved_contexts: list[str]
-    max_length: int | None = None
-    temperature: float = 0.7
+        Args:
+            summarization_type (Literal[SummarizationType.TEXT]): Тип саммаризации.
+            text (str): Исходный текст для саммаризации.
+            temperature (float): Параметр температуры для управления случайностью генерации
+                (0.0 - детерминированный, 1.0+ - более творческий). Defaults to 0.5.
+            max_length (int | None, optional): Максимальная длина саммаризации в токенах или символах.
+                Defaults to None.
+
+        Returns:
+            SummarizationRequest: Запрос на суммаризацию текста.
+        """
+
+        return cls(
+            summarization_type=summarization_type,
+            text=text,
+            temperature=temperature,
+            max_length=max_length,
+        )
+    
+    @classmethod
+    def by_speakers(
+        cls, summarization_type: Literal[SummarizationType.BY_SPEAKERS],
+        text: str, speakers: list[str], temperature: float = 0.5, 
+        max_length: int | None = None,
+    ) -> Self:
+        """Создаёт запрос на суммаризацию текста по спикерам (или ведущим беседу
+        в текстовом виде пользователям).
+
+        Args:
+            summarization_type (Literal[SummarizationType.BY_SPEAKERS]): Тип саммаризации.
+            text (str): Исходный текст для саммаризации.
+            speakers (list[str]): Список спикеров.
+            temperature (float): Параметр температуры для управления случайностью генерации
+                (0.0 - детерминированный, 1.0+ - более творческий). Defaults to 0.5.
+            max_length (int | None, optional): Максимальная длина саммаризации в токенах или символах.
+                Defaults to None.
+
+        Returns:
+            SummarizationRequest: Запрос на суммаризацию текста по спикерам.
+        """
+
+        return cls(
+            summarization_type=summarization_type,
+            text=text,
+            speakers=speakers,
+            temperature=temperature,
+            max_length=max_length,
+        )
+    
+    @classmethod
+    def by_topics(
+        cls, summarization_type: Literal[SummarizationType.BY_TOPICS],
+        text: str, topics: list[str], temperature: float = 0.5,
+        max_length: int | None = None,
+    ) -> Self:
+        """Создаёт запрос на суммаризацию текста по темам.
+
+        Args:
+            summarization_type (Literal[SummarizationType.BY_TOPICS]): Тип саммаризации.
+            text (str): Исходный текст для саммаризации.
+            topics (list[str]): Темы для саммаризации.
+            temperature (float): Параметр температуры для управления случайностью генерации
+                (0.0 - детерминированный, 1.0+ - более творческий). Defaults to 0.5.
+            max_length (int | None, optional): Максимальная длина саммаризации в токенах или символах.
+                Defaults to None.
+
+        Returns:
+            SummarizationRequest: Запрос на суммаризацию текста по темам.
+        """
+
+        return cls(
+            summarization_type=summarization_type,
+            text=text,
+            topics=topics,
+            temperature=temperature,
+            max_length=max_length,
+        )
 
 
 class BaseLLM(ABC):
-    """
-    Абстрактный базовый класс для работы с LLM.
+    """Абстрактный базовый класс для работы с LLM.
     Определяет интерфейс для саммаризации и RAG.
     """
 
+    def __init__(self, **kwargs: Any):
+        """Конструктор класса."""
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    @property
     @abstractmethod
-    def summarize_text(self, text: str, max_length: int | None = None) -> str:
+    def summary_type2prompt(self) -> dict[SummarizationType | Literal["RAG"], str]:
+        """Абстрактный маппинг вида {тип суммаризации: промпт для LLM}.
+        Должен быть реализован в подклассах.
         """
-        Саммаризация обычного текста.
-        
-        Args:
-            text: Текст для саммаризации
-            max_length: Максимальная длина саммари
-            
-        Returns:
-            Саммаризованный текст
-        """
-        pass
 
     @abstractmethod
-    def summarize_dialogue_by_speakers(
-        self, 
-        dialogue: str, 
-        speakers: list[str],
-        max_length: int | None = None
-    ) -> dict[str, str]:
-        """
-        Саммаризация полилога с разбивкой по спикерам.
-        
+    def make_rich_prompt(self, prompt: dict[str, str]) -> Any:
+        """Преобразует готовые промпты для LLM из словарей таким образом,
+        чтобы используемая модель поддерживала ввод.
+
         Args:
-            dialogue: Текст диалога/полилога
-            speakers: Список имен спикеров
-            max_length: Максимальная длина саммари для каждого спикера
-            
+            prompt (dict[str, str]): Словарь частей промпта,
+                из которых можно составить цельный промпт.
+
         Returns:
-            Словарь {спикер: саммари_его_высказываний}
+            Any: Промпт строкой или словарем, в завивсимости
+                от возможностей API или бэкэнда используемой модели.
         """
-        pass
 
     @abstractmethod
-    def summarize_by_topics(
-        self, 
-        text: str, 
-        topics: list[str],
-        max_length: int | None = None
-    ) -> dict[str, str]:
-        """
-        Выделение и саммаризация по указанным темам.
-        
+    def _generate(
+        self, prompt: Any, temperature: float, max_tokens: int | None,
+    ) -> str:
+        """Генерации ответа LLM.
+
         Args:
-            text: Текст для анализа
-            topics: Список тем для выделения
-            max_length: Максимальная длина саммари для каждой темы
+            prompt (Any): Полный промпт для LLM.
+            max_tokens (int | None, optional): Максимальная длина ответа в токенах. Defaults to None.
+            temperature (float): Параметр температуры для управления случайностью генерации
+                (0.0 - детерминированный, 1.0+ - более творческий).
+
+        Returns:
+            str: Результат генерации.
+        """
+
+    def summarize(self, request: SummarizationRequest) -> str | dict[str, str]:
+        """Универсальный метод саммаризации.
+
+        Args:
+            request (SummarizationRequest): Объект запроса с параметрами саммаризации.
             
         Returns:
-            Словарь {тема: саммари_по_этой_теме}
+            str | dict[str, str]: Результат суммаризации. При `SummarizationRequest.summarization_type`
+                - `SummarizationType.TEXT` - сгенерированный ответ (строка).
+                - `SummarizationType.BY_SPEAKERS` - набор сгенерированных ответов для каждого спикера,
+                    словарь вида {спикер: результат суммаризации}.
+                - `SummarizationTypeBY_TOPICS` - набор сгенерированных ответов для каждой темы,
+                    словарь вида {тема: результат суммаризации}.
         """
-        pass
 
-    @abstractmethod
-    def find_untouched_topics(
-        self, 
-        text: str, 
-        expected_topics: list[str]
-    ) -> list[str]:
-        """
-        Определение тем из списка, которые НЕ были затронуты в тексте.
+        prompt_parts: dict[str, str] = {}
+        system_prompt = self.summary_type2prompt.get(request.summarization_type)
+
+        if system_prompt is None:
+            raise RuntimeError("Маппинга типов запроса к промптам не был определен.")
+        prompt_parts["system"] = system_prompt
+
+        match request.summarization_type:
+            case SummarizationType.TEXT:
+                # В таком случае никаких дополнительных действий не нужно
+                pass
         
-        Args:
-            text: Текст для анализа
-            expected_topics: Список ожидаемых тем
+            case SummarizationType.BY_SPEAKERS:
+                if not request.speakers:
+                    raise ValueError("Не указаны спикеры для суммаризации.")
+                prompt_parts["user"] = f"Список спикеров: {request.speakers}.\n\n"
             
-        Returns:
-            Список незатронутых тем
-        """
-        pass
+            case SummarizationType.BY_TOPICS:
+                if not request.topics:
+                    raise ValueError("Не указаны темы для суммаризации.")
+                prompt_parts["user"] = f"Список тем: {request.topics}.\n\n"
 
-    @abstractmethod
+        user_prompt = prompt_parts.get("user", "")
+        prompt_parts["user"] = user_prompt + request.text
+
+        full_prompt = self.make_rich_prompt(prompt_parts)
+        return self._generate(
+            full_prompt,
+            request.temperature,
+            request.max_length,
+        )
+
     def generate_with_rag(
         self, 
         query: str, 
         retrieved_contexts: list[str],
+        temperature: float,
         max_length: int | None = None,
-        temperature: float = 0.7
     ) -> str:
-        """
-        Генерация ответа на основе найденных контекстов (RAG).
-        
-        Args:
-            query: Вопрос пользователя
-            retrieved_contexts: Список найденных релевантных текстов
-            max_length: Максимальная длина ответа
-            temperature: Температура генерации
-            
-        Returns:
-            Сгенерированный ответ
-        """
-        pass
+        """Генерация ответа на основе найденных контекстов (RAG).
 
-    def summarize(self, request: SummarizationRequest) -> Any:
-        """
-        Универсальный метод саммаризации.
-        
         Args:
-            request: Объект запроса с параметрами саммаризации
+            query (str): Вопрос пользователя.
+            retrieved_contexts (list[str]):Список извлеченных релевантных контекстов из базы знаний.
+            temperature (float): Параметр температуры для управления случайностью генерации
+                (0.0 - детерминированный, 1.0+ - более творческий).
+            max_length (int | None): Максимальная длина генерируемого ответа в токенах.
+                Defaults to None.
             
         Returns:
-            Результат саммаризации (str или Dict)
+            str: Сгенерированный ответ на основе предоставленного контекста.
         """
-        match request.summarization_type:
-            case SummarizationType.TEXT:
-                return self.summarize_text(request.text, request.max_length)
-        
-            case SummarizationType.DIALOGUE_BY_SPEAKERS:
-                if not request.speakers:
-                    raise ValueError("Speakers list required for DIALOGUE_BY_SPEAKERS")
-                return self.summarize_dialogue_by_speakers(
-                    request.text, 
-                    request.speakers, 
-                    request.max_length
-                )
-            
-            case SummarizationType.BY_TOPICS:
-                if not request.topics:
-                    raise ValueError("Topics list required for BY_TOPICS")
-                return self.summarize_by_topics(
-                    request.text, 
-                    request.topics, 
-                    request.max_length
-                )
-            
-            case SummarizationType.UNTOUCHED_TOPICS:
-                if not request.topics:
-                    raise ValueError("Topics list required for UNTOUCHED_TOPICS")
-                return self.find_untouched_topics(request.text, request.topics)
+
+        prompt_parts: dict[str, str] = {}
+        system_prompt = self.summary_type2prompt.get("RAG")
+
+        if system_prompt is None:
+            raise RuntimeError(
+                "При переопределении маппинга типов запроса к промптам не был определен промпт для RAG."
+            )
+        prompt_parts["system"] = system_prompt
+
+        context_text = "\n".join([
+            f"[Документ {i+1}]:\n{ctx}" 
+            for i, ctx in enumerate(retrieved_contexts)
+        ])
+        prompt_parts["user"] = f"КОНТЕКСТ:\n{context_text}\n\nВОПРОС ПОЛЬЗОВАТЕЛЯ:\n{query}"
+
+        full_prompt = self.make_rich_prompt(prompt_parts)
+        return self._generate(
+            full_prompt,
+            temperature,
+            max_length,
+        )
