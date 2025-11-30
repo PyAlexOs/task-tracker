@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from vllm import LLM, SamplingParams
 
-from src.text_summarizer.core.base import BaseLLM, SummarizationType
+from ..base import BaseLLM, SummarizationType
 
 
 class LocalLLM(BaseLLM):
@@ -33,7 +33,7 @@ class LocalLLM(BaseLLM):
         self.max_tokens = max_tokens
 
         self._client = LLM(
-            model=self.model_path,
+            model=str(self.model_path),
             tensor_parallel_size=kwargs.get("tensor_parallel_size", 1),
             gpu_memory_utilization=kwargs.get("gpu_memory_utilization", 0.9),
             trust_remote_code=kwargs.get("trust_remote_code", False),

@@ -1,8 +1,10 @@
+"""Реализация обёртки LLM с использованием OpenAI API."""
+
 from typing import Literal
 
 from openai import OpenAI
 
-from src.text_summarizer.core.base import BaseLLM, SummarizationType
+from ..base import BaseLLM, SummarizationType
 
 
 class OpenAILLM(BaseLLM):

@@ -2,7 +2,7 @@
 удаления шумов, транскрибации и диаризации аудио.
 """
 
-from src.speech_transcriptor.core.base import (
+from .base import (
     ModelName,
     SpeechTranscriptor,
     TranscriptionSegment,

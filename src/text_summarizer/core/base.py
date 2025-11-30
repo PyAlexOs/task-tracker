@@ -55,7 +55,6 @@ class SummarizationRequest:
     @classmethod
     def common_summary(
         cls,
-        summarization_type: Literal[SummarizationType.TEXT],
         text: str,
         temperature: float = 0.5,
         max_length: int | None = None,
@@ -63,7 +62,6 @@ class SummarizationRequest:
         """Создаёт запрос на обычную суммаризацию текста.
 
         Args:
-            summarization_type (Literal[SummarizationType.TEXT]): Тип саммаризации.
             text (str): Исходный текст для саммаризации.
             temperature (float): Параметр температуры для управления случайностью генерации
                 (0.0 - детерминированный, 1.0+ - более творческий). Defaults to 0.5.
@@ -75,7 +73,7 @@ class SummarizationRequest:
         """
 
         return cls(
-            summarization_type=summarization_type,
+            summarization_type=SummarizationType.TEXT,
             text=text,
             temperature=temperature,
             max_length=max_length,
@@ -84,7 +82,6 @@ class SummarizationRequest:
     @classmethod
     def by_speakers(
         cls,
-        summarization_type: Literal[SummarizationType.BY_SPEAKERS],
         text: str,
         speakers: list[str],
         temperature: float = 0.5,
@@ -94,7 +91,6 @@ class SummarizationRequest:
         в текстовом виде пользователям).
 
         Args:
-            summarization_type (Literal[SummarizationType.BY_SPEAKERS]): Тип саммаризации.
             text (str): Исходный текст для саммаризации.
             speakers (list[str]): Список спикеров.
             temperature (float): Параметр температуры для управления случайностью генерации
@@ -107,7 +103,7 @@ class SummarizationRequest:
         """
 
         return cls(
-            summarization_type=summarization_type,
+            summarization_type=SummarizationType.BY_SPEAKERS,
             text=text,
             speakers=speakers,
             temperature=temperature,
@@ -117,7 +113,6 @@ class SummarizationRequest:
     @classmethod
     def by_topics(
         cls,
-        summarization_type: Literal[SummarizationType.BY_TOPICS],
         text: str,
         topics: list[str],
         temperature: float = 0.5,
@@ -126,7 +121,6 @@ class SummarizationRequest:
         """Создаёт запрос на суммаризацию текста по темам.
 
         Args:
-            summarization_type (Literal[SummarizationType.BY_TOPICS]): Тип саммаризации.
             text (str): Исходный текст для саммаризации.
             topics (list[str]): Темы для саммаризации.
             temperature (float): Параметр температуры для управления случайностью генерации
@@ -139,7 +133,7 @@ class SummarizationRequest:
         """
 
         return cls(
-            summarization_type=summarization_type,
+            summarization_type=SummarizationType.BY_TOPICS,
             text=text,
             topics=topics,
             temperature=temperature,
