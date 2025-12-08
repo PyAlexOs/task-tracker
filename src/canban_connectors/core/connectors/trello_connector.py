@@ -119,10 +119,18 @@ class TrelloKanbanBoard(KanbanBoardBase):
         ]
 
         # Получаем информацию об ответственных
-        members = [
-            {"id": member.id, "full_name": member.full_name, "username": member.username}
-            for member in card.member_id
-        ]
+        members = []
+        if card.member_id:
+            for member_id in card.member_id:
+                try:
+                    member = self._client.get_member(member_id)
+                    members.append({
+                        "id": member.id,
+                        "full_name": member.full_name,
+                        "username": member.username
+                    })
+                except Exception as e:
+                    self.logger.warning(f"Не удалось загрузить участника {member_id}: {e}")
 
         # Получаем чек-листы
         checklists_data = []
@@ -168,26 +176,51 @@ class TrelloKanbanBoard(KanbanBoardBase):
         members: list[str] | None = None,
         due_date: datetime | None = None,
         checklist_items: dict[str, list[str]] | None = None,
-    ) -> dict[str, Any]:
-        trello_list = self._client.get_list(list_id)
-        card = trello_list.add_card(
-            name=name,
-            desc=description or "",
-            labels=labels or [],
-            due=due_date.isoformat() if due_date else "null",
-        )
+        ) -> dict[str, Any]:
+        try:
+            trello_list = self._client.get_list(list_id)
+            
+            # Создаем карточку БЕЗ меток (они будут добавлены потом)
+            card = trello_list.add_card(
+                name=name,
+                desc=description or "",
+            )
+            
+            # Добавляем due date если указан
+            if due_date:
+                card.set_due(due_date)
+            
+            # Добавляем метки через add_label
+            if labels:
+                for label_id in labels:
+                    try:
+                        card.add_label(card.board.get_label(label_id))
+                    except Exception as e:
+                        self.logger.warning(f"Не удалось добавить метку {label_id}: {e}")
+            
+            # Добавляем ответственных
+            if members:
+                for member_id in members:
+                    try:
+                        member = self._client.get_member(member_id)
+                        card.add_member(member)
+                    except Exception as e:
+                        self.logger.warning(f"Не удалось добавить участника {member_id}: {e}")
+            
+            # Добавляем чек-листы
+            if checklist_items:
+                for checklist_name, items in checklist_items.items():
+                    try:
+                        card.add_checklist(checklist_name, items)
+                    except Exception as e:
+                        self.logger.warning(f"Не удалось добавить чек-лист {checklist_name}: {e}")
 
-        # Добавляем ответственных
-        if members:
-            for member_id in members:
-                card.add_member(self._client.get_member(member_id))
+        except Exception:
+            self.logger.exception("Ошибка при создании карточки.")
+            raise
 
-        # Добавляем чек-листы
-        if checklist_items:
-            for checklist_name, items in checklist_items.items():
-                card.add_checklist(checklist_name, items)
-
-        return {"id": card.id, "name": card.name, "url": card.url}
+        else:
+            return {"id": card.id, "name": card.name, "url": card.url}
 
     def move_card_to_list(self, card_id: str, list_id: str) -> bool:
         try:
