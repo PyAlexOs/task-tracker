@@ -13,13 +13,18 @@ dependencies = [
 [project.optional-dependencies]
 
 api-gateway = [
+    "aioboto3>=15.5.0",
     "fastapi>=0.120.1",
     "uvicorn>=0.38.0",
 ]
 
-canban-connectors = [
-    "kaiten>=1.0.0",
+trello-canban-connector = [
     "py-trello>=0.20.1",
+]
+
+# Появится позже
+kaiten-canban-connector = [
+    "kaiten>=1.0.0",
 ]
 
 similarity = [
@@ -30,6 +35,7 @@ similarity = [
 ]
 
 speech-transcriptor = [
+    "aioboto3>=15.5.0",
     "noisereduce>=3.0.3",
     "numpy>=2.2.6",
     "openai-whisper>=20250625",
@@ -45,8 +51,12 @@ text-summarizer = [
     "vllm>=0.11.2",
 ]
 
-user-connectors = [
+telegram-user-connector = [
+    "aiogram>=3.23.0",
+]
 
+streamlit-user-connector = [
+    "streamlit>=1.52.1",
 ]
 
 dev = [
