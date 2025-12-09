@@ -54,7 +54,7 @@ services:
     command: server /data --console-address ":9001"
     
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -94,11 +94,16 @@ services:
   # =========================== #
 
   api_gateway:
-    build: ./src/api_gateway
+    build:
+      context: .
+      dockerfile: src/api_gateway/Dockerfile
     container_name: api_gateway
     hostname: api_gateway
     restart: unless-stopped
     
+    env_file:
+      - .env
+
     environment:
       APP_PORT: 8850
     
@@ -142,11 +147,16 @@ services:
   # ======================== #
 
   speech_transcriptor:
-    build: ./src/speech_transcriptor
+    build:
+      context: .
+      dockerfile: src/speech_transcriptor/Dockerfile
     container_name: speech_transcriptor
     hostname: speech_transcriptor
     restart: unless-stopped
     
+    env_file:
+      - .env
+
     environment:
       APP_PORT: 8851
     
@@ -176,16 +186,29 @@ services:
         limits:
           memory: 8g
 
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   # =================================== #
   # Обёртка LLM (для RAG'а в том числе) #
   # =================================== #
 
   text_summarizer:
-    build: ./src/text_summarizer
+    build:
+      context: .
+      dockerfile: src/text_summarizer/Dockerfile
     container_name: text_summarizer
     hostname: text_summarizer
     restart: unless-stopped
     
+    env_file:
+      - .env
+
     environment:
       APP_PORT: 8852
     
@@ -211,16 +234,29 @@ services:
         limits:
           memory: 512m
 
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   # ================== #
   # Similarity скоринг #
   # ================== #
 
   similarity:
-    build: ./src/similarity
+    build:
+      context: .
+      dockerfile: src/similarity/Dockerfile
     container_name: similarity
     hostname: similarity
     restart: unless-stopped
     
+    env_file:
+      - .env
+
     environment:
       APP_PORT: 8853
     
@@ -250,17 +286,29 @@ services:
         limits:
           memory: 8g
 
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   # ====================== #
   # caban connector Trello #
   # ====================== #
 
   trello_canban_connector:
-    context: ./src/canban_connectors
-    dockerfile: Dockerfile.trello
+    build:
+      context: .
+      dockerfile: src/canban_connectors/Dockerfile.trello
     container_name: trello_canban_connector
     hostname: trello_canban_connector
     restart: unless-stopped
     
+    env_file:
+      - .env
+
     environment:
       APP_PORT: 8854
     
@@ -283,6 +331,14 @@ services:
         limits:
           memory: 512m
 
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   # / EXAMPLE /
   # ====================== #
   # caban connector Kaiten #
@@ -291,12 +347,16 @@ services:
   # какой коннектор использовать для canban досок
 
   # kaiten_canban_connector:
-  #   context: ./src/canban_connectors
-  #   dockerfile: Dockerfile.kaiten
+  #   build:
+  #     context: .
+  #     dockerfile: src/canban_connectors/Dockerfile.kaiten
   #   container_name: kaiten_canban_connector
   #   hostname: kaiten_canban_connector
   #   restart: unless-stopped
     
+  #   env_file:
+  #     - .env
+
   #   environment:
   #     APP_PORT: 8855
     
@@ -319,6 +379,14 @@ services:
   #       limits:
   #         memory: 512m
 
+  #   depends_on:
+  #     rabbitmq:
+  #       condition: service_healthy
+  #     minio:
+  #       condition: service_healthy
+  #     postgres:
+  #       condition: service_healthy
+
   # / EXAMPLE /
 
   # / EXAMPLE /
@@ -332,12 +400,16 @@ services:
   # ========================= #
 
   telegram_user_connector:
-    context: ./src/user_connectors
-    dockerfile: Dockerfile.telegram
+    build:
+      context: .
+      dockerfile: src/user_connectors/Dockerfile.telegram
     container_name: telegram_user_connector
     hostname: telegram_user_connector
     restart: unless-stopped
     
+    env_file:
+      - .env
+
     environment:
       APP_PORT: 8856
     
@@ -360,27 +432,39 @@ services:
         limits:
           memory: 512m
 
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   # ========================== #
   # user connector - streamlit #
   # ========================== #
 
   streamlit_user_connector:
-    context: ./src/user_connectors
-    dockerfile: Dockerfile.streamlit
+    build:
+      context: .
+      dockerfile: src/user_connectors/Dockerfile.streamlit
     container_name: streamlit_user_connector
     hostname: streamlit_user_connector
     restart: unless-stopped
     
+    env_file:
+      - .env
+
     environment:
       APP_PORT: 8857
     
     ports:
       - "8857:8857"
 
-    command: ["uv", "run", "-m", "src.user_connectors.streamlit_service"]
+    command: ["sh", "-c", "uv run -m streamlit run src.user_connectors.streamlit_service --server.port=$${APP_PORT}"]
     
     healthcheck:
-      test: ["CMD-SHELL", "grep -q :$$(printf '%04X' $${APP_PORT:-8000}) /proc/net/tcp6"]
+      test: ["CMD-SHELL", "curl --fail http://localhost:8857/_stcore/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -392,6 +476,14 @@ services:
           memory: 512m
         limits:
           memory: 512m
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
 
   # / EXAMPLE /
   # ===================================== #

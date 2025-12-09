@@ -11,8 +11,7 @@ RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 
-# Копируем файлы проекта из родительской директории
-COPY ../pyproject.toml ../uv.lock ./
+COPY pyproject.toml uv.lock ./
 COPY src/api_gateway ./src/api_gateway
 
 # TODO убрать --extra dev, пока что он нужен для работы без pydantic-settings

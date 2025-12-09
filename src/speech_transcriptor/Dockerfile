@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -11,8 +11,7 @@ RUN pip install --no-cache-dir uv
 
 WORKDIR /app
 
-# Копируем файлы проекта из родительской директории
-COPY ../pyproject.toml ../uv.lock ./
+COPY pyproject.toml uv.lock ./
 COPY src/speech_transcriptor ./src/speech_transcriptor
 
 # TODO убрать --extra dev, пока что он нужен для работы без pydantic-settings
