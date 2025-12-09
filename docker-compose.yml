@@ -1,66 +1,407 @@
-version: '1.0'
-
 services:
+
+  # =================== #
+  # Асинхронная очередь #
+  # =================== #
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    hostname: rabbitmq
+    restart: unless-stopped
+    
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+      RABBITMQ_DEFAULT_VHOST: /
+    
+    ports:
+      - "5672:5672"    # API
+      - "15672:15672"  # Web
+    
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_logs:/var/log/rabbitmq
+    
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # =================== #
+  # Хранилище файлов S3 #
+  # =================== #
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    hostname: minio
+    restart: unless-stopped
+    
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: adminpassword
+    
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Web
+    
+    volumes:
+      - minio_data:/data
+    
+    command: server /data --console-address ":9001"
+    
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # =================================== #
+  # База данных (для RAG'а в том числе) #
+  # =================================== #
+
   postgres:
     image: pgvector/pgvector:pg17
-    container_name: postgres-pgvector
+    container_name: postgres
+    hostname: postgres
+    restart: unless-stopped
+    
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: task-tracker
+    
     ports:
       - "5432:5432"
+    
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
-    restart: unless-stopped
-    networks:
-      - app-network
+    
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "admin", "-d", "task-tracker"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
 
-  rabbitmq:
-    image: rabbitmq:3-management
-    container_name: rabbitmq
-    environment:
-      - RABBITMQ_DEFAULT_USER=${RABBITMQ_DEFAULT_USER}
-      - RABBITMQ_DEFAULT_PASSWORD=${RABBITMQ_DEFAULT_PASSWORD}
-    ports:
-      - "5672:5672"    # AMQP protocol port
-      - "15672:15672"  # Management UI
-    volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
-      - rabbitmq_log:/var/log/rabbitmq
-    restart: unless-stopped
-    networks:
-      - app-network
+  # =========================== #
+  # API сервиса - бизнес логика #
+  # =========================== #
 
   api_gateway:
     build: ./src/api_gateway
-    container_name: api_gateway-container
-    command: ["uv", "run", "-m", "src.api_gateway.service"]
-    ports:
-      - ${APP_PORT}:${APP_PORT}
+    container_name: api_gateway
+    hostname: api_gateway
+    restart: unless-stopped
+    
     environment:
-      - APP_PORT=${APP_PORT}
-      - VAULT_URL=${VAULT_URL}
-      - VAULT_TOKEN=${VAULT_TOKEN}
-      - VAULT_MOUNT=${VAULT_MOUNT}
+      APP_PORT: 8850
+    
+    ports:
+      - "8850:8850"
+    
+    command: ["uv", "run", "-m", "src.api_gateway.service"]
+    
     healthcheck:
       test: ["CMD", "sh", "-c", "curl -f http://localhost:$${APP_PORT:-8000}/health"]
-      interval: 20s
+      interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
+    
     deploy:
-      restart_policy:
-        condition: on-failure
-        delay: 1m
       resources:
         reservations:
-          memory: 2g
+          memory: 512m
         limits:
-          memory: 3g
+          memory: 512m
+    
+    depends_on:
+      speech_transcriptor:
+        condition: service_healthy
+      text_summarizer:
+        condition: service_healthy
+      similarity:
+        condition: service_healthy
+      trello_canban_connector:
+        condition: service_healthy
+      # kaiten_canban_connector:
+      #   condition: service_healthy
+      telegram_user_connector:
+        condition: service_healthy
+      streamlit_user_connector:
+        condition: service_healthy
+
+  # ======================== #
+  # Транскрибатор-диаризатор #
+  # ======================== #
+
+  speech_transcriptor:
+    build: ./src/speech_transcriptor
+    container_name: speech_transcriptor
+    hostname: speech_transcriptor
+    restart: unless-stopped
+    
+    environment:
+      APP_PORT: 8851
+    
+    ports:
+      - "8851:8851"
+
+    command: ["uv", "run", "-m", "src.speech_transcriptor.service"]
+    
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q :$$(printf '%04X' $${APP_PORT:-8000}) /proc/net/tcp6"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    deploy:
+      resources:
+        reservations:
+          memory: 4g
+
+          # Если есть видеокарта
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+        limits:
+          memory: 8g
+
+  # =================================== #
+  # Обёртка LLM (для RAG'а в том числе) #
+  # =================================== #
+
+  text_summarizer:
+    build: ./src/text_summarizer
+    container_name: text_summarizer
+    hostname: text_summarizer
+    restart: unless-stopped
+    
+    environment:
+      APP_PORT: 8852
+    
+    ports:
+      - "8852:8852"
+
+    command: ["uv", "run", "-m", "src.text_summarizer.service"]
+    
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q :$$(printf '%04X' $${APP_PORT:-8000}) /proc/net/tcp6"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    deploy:
+      resources:
+        reservations:
+          memory: 512m
+
+          # Если модель поднимается локально, необходимо добавить сюда CUDA
+
+        limits:
+          memory: 512m
+
+  # ================== #
+  # Similarity скоринг #
+  # ================== #
+
+  similarity:
+    build: ./src/similarity
+    container_name: similarity
+    hostname: similarity
+    restart: unless-stopped
+    
+    environment:
+      APP_PORT: 8853
+    
+    ports:
+      - "8853:8853"
+
+    command: ["uv", "run", "-m", "src.similarity.service"]
+    
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q :$$(printf '%04X' $${APP_PORT:-8000}) /proc/net/tcp6"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    deploy:
+      resources:
+        reservations:
+          memory: 4g
+
+          # Если есть видеокарта
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+        limits:
+          memory: 8g
+
+  # ====================== #
+  # caban connector Trello #
+  # ====================== #
+
+  trello_canban_connector:
+    context: ./src/canban_connectors
+    dockerfile: Dockerfile.trello
+    container_name: trello_canban_connector
+    hostname: trello_canban_connector
+    restart: unless-stopped
+    
+    environment:
+      APP_PORT: 8854
+    
+    ports:
+      - "8854:8854"
+
+    command: ["uv", "run", "-m", "src.canban_connectors.trello_service"]
+    
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q :$$(printf '%04X' $${APP_PORT:-8000}) /proc/net/tcp6"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    deploy:
+      resources:
+        reservations:
+          memory: 512m
+        limits:
+          memory: 512m
+
+  # / EXAMPLE /
+  # ====================== #
+  # caban connector Kaiten #
+  # ====================== #
+  # TODO возможно потом использовать profiles, чтобы указывать при поднятии сервиса,
+  # какой коннектор использовать для canban досок
+
+  # kaiten_canban_connector:
+  #   context: ./src/canban_connectors
+  #   dockerfile: Dockerfile.kaiten
+  #   container_name: kaiten_canban_connector
+  #   hostname: kaiten_canban_connector
+  #   restart: unless-stopped
+    
+  #   environment:
+  #     APP_PORT: 8855
+    
+  #   ports:
+  #     - "8855:8855"
+
+  #   command: ["uv", "run", "-m", "src.canban_connectors.kaiten_service"]
+    
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "grep -q :$$(printf '%04X' $${APP_PORT:-8000}) /proc/net/tcp6"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 60s
+    
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         memory: 512m
+  #       limits:
+  #         memory: 512m
+
+  # / EXAMPLE /
+
+  # / EXAMPLE /
+  # ====================================== #
+  # caban connector другие тоже могут быть #
+  # ====================================== #
+  # / EXAMPLE /
+
+  # ========================= #
+  # user connector - telegram #
+  # ========================= #
+
+  telegram_user_connector:
+    context: ./src/user_connectors
+    dockerfile: Dockerfile.telegram
+    container_name: telegram_user_connector
+    hostname: telegram_user_connector
+    restart: unless-stopped
+    
+    environment:
+      APP_PORT: 8856
+    
+    ports:
+      - "8856:8856"
+
+    command: ["uv", "run", "-m", "src.user_connectors.telegram_service"]
+    
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q :$$(printf '%04X' $${APP_PORT:-8000}) /proc/net/tcp6"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    deploy:
+      resources:
+        reservations:
+          memory: 512m
+        limits:
+          memory: 512m
+
+  # ========================== #
+  # user connector - streamlit #
+  # ========================== #
+
+  streamlit_user_connector:
+    context: ./src/user_connectors
+    dockerfile: Dockerfile.streamlit
+    container_name: streamlit_user_connector
+    hostname: streamlit_user_connector
+    restart: unless-stopped
+    
+    environment:
+      APP_PORT: 8857
+    
+    ports:
+      - "8857:8857"
+
+    command: ["uv", "run", "-m", "src.user_connectors.streamlit_service"]
+    
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q :$$(printf '%04X' $${APP_PORT:-8000}) /proc/net/tcp6"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
+    deploy:
+      resources:
+        reservations:
+          memory: 512m
+        limits:
+          memory: 512m
+
+  # / EXAMPLE /
+  # ===================================== #
+  # user connector другие тоже могут быть #
+  # ===================================== #
+  # / EXAMPLE /
+
 
 volumes:
-  postgres_data:
   rabbitmq_data:
-  rabbitmq_log:
+  rabbitmq_logs:
+  minio_data:
+  postgres_data:
