@@ -1,7 +1,5 @@
 """Имплементация коннектора к канбан-доске Kaiten."""
 
-from kaiten import KaitenClient
-
 from ..base import KanbanBoardBase
 
 

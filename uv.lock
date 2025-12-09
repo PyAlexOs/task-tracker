@@ -3244,6 +3244,12 @@ dev = [
     { name = "pre-commit" },
     { name = "ruff" },
 ]
+similarity = [
+    { name = "numpy" },
+    { name = "scipy" },
+    { name = "torch" },
+    { name = "transformers" },
+]
 speech-transcriptor = [
     { name = "noisereduce" },
     { name = "numpy" },
@@ -3269,6 +3275,7 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.19.0" },
     { name = "nbstripout", marker = "extra == 'dev'", specifier = ">=0.8.2" },
     { name = "noisereduce", marker = "extra == 'speech-transcriptor'", specifier = ">=3.0.3" },
+    { name = "numpy", marker = "extra == 'similarity'", specifier = ">=2.2.6" },
     { name = "numpy", marker = "extra == 'speech-transcriptor'", specifier = ">=2.2.6" },
     { name = "openai", marker = "extra == 'text-summarizer'", specifier = ">=2.8.1" },
     { name = "openai-whisper", marker = "extra == 'speech-transcriptor'", specifier = ">=20250625" },
@@ -3280,8 +3287,11 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.11.0" },
     { name = "pydub", marker = "extra == 'speech-transcriptor'", specifier = ">=0.25.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.14.7" },
+    { name = "scipy", marker = "extra == 'similarity'", specifier = ">=1.15.3" },
     { name = "scipy", marker = "extra == 'speech-transcriptor'", specifier = ">=1.15.3" },
+    { name = "torch", marker = "extra == 'similarity'", specifier = ">=2.9.0" },
     { name = "torch", marker = "extra == 'speech-transcriptor'", specifier = ">=2.9.0" },
+    { name = "transformers", marker = "extra == 'similarity'", specifier = ">=4.57.1" },
     { name = "uvicorn", marker = "extra == 'api-gateway'", specifier = ">=0.38.0" },
     { name = "vllm", marker = "extra == 'text-summarizer'", specifier = ">=0.11.2" },
 ]

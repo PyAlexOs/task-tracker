@@ -23,7 +23,10 @@ canban-connectors = [
 ]
 
 similarity = [
-
+    "numpy>=2.2.6",
+    "scipy>=1.15.3",
+    "torch>=2.9.0",
+    "transformers>=4.57.1",
 ]
 
 speech-transcriptor = [

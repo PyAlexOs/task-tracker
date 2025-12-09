@@ -46,18 +46,17 @@ class TrelloKanbanBoard(KanbanBoardBase):
     def get_board_id_by_name(self, board_name: str) -> str | None:
         try:
             boards = self._client.list_boards()
-            
+
             for board in boards:
                 if board.name == board_name:
                     return str(board.id)
-            
+
             self.logger.warning(f"Доска с названием '{board_name}' не найдена.")
-        
+
         except Exception:
             self.logger.exception("Ошибка при поиске доски по названию.")
 
         return None
-
 
     def get_all_cards(self, board_id: str) -> list[dict[str, Any]]:
         board = self._client.get_board(board_id)
@@ -124,11 +123,13 @@ class TrelloKanbanBoard(KanbanBoardBase):
             for member_id in card.member_id:
                 try:
                     member = self._client.get_member(member_id)
-                    members.append({
-                        "id": member.id,
-                        "full_name": member.full_name,
-                        "username": member.username
-                    })
+                    members.append(
+                        {
+                            "id": member.id,
+                            "full_name": member.full_name,
+                            "username": member.username,
+                        }
+                    )
                 except Exception as e:
                     self.logger.warning(f"Не удалось загрузить участника {member_id}: {e}")
 
@@ -176,20 +177,20 @@ class TrelloKanbanBoard(KanbanBoardBase):
         members: list[str] | None = None,
         due_date: datetime | None = None,
         checklist_items: dict[str, list[str]] | None = None,
-        ) -> dict[str, Any]:
+    ) -> dict[str, Any]:
         try:
             trello_list = self._client.get_list(list_id)
-            
+
             # Создаем карточку БЕЗ меток (они будут добавлены потом)
             card = trello_list.add_card(
                 name=name,
                 desc=description or "",
             )
-            
+
             # Добавляем due date если указан
             if due_date:
                 card.set_due(due_date)
-            
+
             # Добавляем метки через add_label
             if labels:
                 for label_id in labels:
@@ -197,7 +198,7 @@ class TrelloKanbanBoard(KanbanBoardBase):
                         card.add_label(card.board.get_label(label_id))
                     except Exception as e:
                         self.logger.warning(f"Не удалось добавить метку {label_id}: {e}")
-            
+
             # Добавляем ответственных
             if members:
                 for member_id in members:
@@ -206,7 +207,7 @@ class TrelloKanbanBoard(KanbanBoardBase):
                         card.add_member(member)
                     except Exception as e:
                         self.logger.warning(f"Не удалось добавить участника {member_id}: {e}")
-            
+
             # Добавляем чек-листы
             if checklist_items:
                 for checklist_name, items in checklist_items.items():
@@ -264,7 +265,7 @@ class TrelloKanbanBoard(KanbanBoardBase):
         card_id: str,
         checklist_name: str,
         item_name: str | None = None,
-         add_item: bool = False,
+        add_item: bool = False,
         checked: bool | None = None,
     ) -> bool:
         try:
@@ -295,6 +296,6 @@ class TrelloKanbanBoard(KanbanBoardBase):
         except Exception as e:
             print(f"Ошибка при изменении чек-листа: {e}")
             return False
-        
+
         else:
             return True
